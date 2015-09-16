@@ -31,6 +31,11 @@ def main(args):
     # Footprint
     print "dataset.footprint:", dataset.footprint
 
+    # Granules
+
+    for granule in dataset.granules:
+        print granule.granule_identifier
+
     #evens = [some_special_func(even) for even in range(20) if (even % 2) == 0]
     #evens = map(some_special_func, filter(lambda e: e%2 == 0, range(20)))
 

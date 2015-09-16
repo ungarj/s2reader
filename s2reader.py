@@ -38,9 +38,19 @@ import numpy as np
 ## Name of band
 ## type: string
 
+class Granule(object):
+    '''
+    This object contains relevant metadata from a granule.
+    '''
+
+    def __init__(self, granule_identifier):
+        self.granule_identifier = granule_identifier
+
+
 class SentinelDataSet(object):
     '''
-    This class holds all information available from the SAFE file.
+    This object contains relevant metadata from the SAFE file and its containing
+    granules as Granule() object.
     '''
 
     def __init__(self, path):
@@ -69,7 +79,7 @@ class SentinelDataSet(object):
             # Read processing level (e.g. Level-1C)
             self.processing_level = element.find("PROCESSING_LEVEL").text
 
-        # Get Footprint
+        # Get product Footprint
         product_footprint = product_metadata_xml.iter("Product_Footprint")
         # I don't know why two "Product_Footprint items are found."
         for element in product_footprint:
@@ -77,6 +87,16 @@ class SentinelDataSet(object):
             for global_footprint in element.iter("Global_Footprint"):
                 coords = global_footprint.find("EXT_POS_LIST").text.split()
                 self.footprint = footprint_from_coords(coords)
+
+        # Read granule info.
+        granule_list = []
+        for element in product_metadata_xml.iter("Product_Info"):
+            product_organisation = element.find("Product_Organisation")
+
+        self.granules = [
+            Granule(id.find("Granules").attrib["datastripIdentifier"])
+            for id in product_organisation.findall("Granule_List")
+            ]
 
 def footprint_from_coords(coords):
     '''
