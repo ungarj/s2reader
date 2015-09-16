@@ -1,9 +1,13 @@
 #!/usr/bin/env python
+'''
+This module implements an easy abstraction to the SAFE data format used by the
+Sentinel 2 misson of the European Space Agency (ESA)
+'''
 
 import os
 import sys
 import xml.etree.ElementTree as ET
-from shapely.geometry import *
+from shapely.geometry import Polygon
 import numpy as np
 
 # create class SentinelDataSet
@@ -34,35 +38,24 @@ import numpy as np
 ## Name of band
 ## type: string
 
-class SentinelDataSet():
+class SentinelDataSet(object):
+    '''
+    This class holds all information available from the SAFE file.
+    '''
 
     def __init__(self, path):
         self.path = os.path.normpath(path)
-        basename = os.path.splitext(os.path.basename(self.path))[0]
 
         # Find manifest.safe.
         manifest_safe = os.path.join(self.path, "manifest.safe")
         try:
             assert os.path.isfile(manifest_safe)
-        except:
+        except AssertionError:
             error = "manifest.safe not found: %s" %(manifest_safe)
             sys.exit(error)
 
         # Read manifest.safe.
-        manifest = ET.parse(manifest_safe)
-        dataObjectSection = manifest.find("dataObjectSection")
-        for dataObject in dataObjectSection:
-            # Find product metadata XML.
-            if dataObject.attrib.get("ID") == "S2_Level-1C_Product_Metadata":
-                relpath = dataObject.iter("fileLocation").next().attrib["href"]
-                abspath = os.path.join(self.path, relpath)
-                self.product_metadata = abspath
-                try:
-                    assert os.path.isfile(self.product_metadata)
-                except:
-                    error = "S2_Level-1C_Product_Metadata not found: %s" %(
-                        self.product_metadata)
-                    sys.exit(error)
+        self.product_metadata = get_product_metadata(manifest_safe, self.path)
 
         # Read product metadata XML.
         product_metadata_xml = ET.parse(self.product_metadata)
@@ -83,17 +76,55 @@ class SentinelDataSet():
             global_footprint = None
             for global_footprint in element.iter("Global_Footprint"):
                 coords = global_footprint.find("EXT_POS_LIST").text.split()
-                number_of_points = len(coords)/2
-                reshaped = np.array(coords).reshape(number_of_points, 2)
-                points = []
-                for i in reshaped.tolist():
-                    points.append((float(i[1]), float(i[0])))
-                self.footprint = Polygon(points)
+                self.footprint = footprint_from_coords(coords)
+
+def footprint_from_coords(coords):
+    '''
+    Convert list of alterating latitude / longitude coordinates and returns it
+    as a shapely Polygon.
+    '''
+    number_of_points = len(coords)/2
+    coords_as_array = np.array(coords)
+    reshaped = coords_as_array.reshape(number_of_points, 2)
+    points = []
+    for i in reshaped.tolist():
+        points.append((float(i[1]), float(i[0])))
+    footprint = Polygon(points)
+    try:
+        assert footprint.is_valid
+    except Exception:
+        print "Footprint is not valid."
+        raise
+    return footprint
+
+
+def get_product_metadata(manifest_safe, basepath):
+    '''
+    Returns path to product metadata XML file.
+    '''
+    manifest = ET.parse(manifest_safe)
+    data_object_section = manifest.find("dataObjectSection")
+    for data_object in data_object_section:
+        # Find product metadata XML.
+        if data_object.attrib.get("ID") == "S2_Level-1C_Product_Metadata":
+            relpath = data_object.iter("fileLocation").next().attrib["href"]
+            abspath = os.path.join(basepath, relpath)
+            product_metadata = abspath
+            try:
+                assert os.path.isfile(product_metadata)
+            except AssertionError:
+                error = "S2_Level-1C_Product_Metadata not found: %s" %(
+                    product_metadata)
+                raise
+            return product_metadata
+    return None
 
 
 
 # each Granule:
 
+# .MGRS_identifier
+## MGRS string
 # .bbox
 ## Bounding box in WGS84.
 ## type: geometry
@@ -119,8 +150,3 @@ class SentinelDataSet():
 
 
 # --> Image_Display_Order
-
-
-
-def herbert():
-    print "herbert"
