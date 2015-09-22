@@ -1,6 +1,9 @@
 # s2reader
 Simple python module to read Sentinel 2 metadata from SAFE.
 
+To get more information on the data format, please be refered to the official
+Sentinel 2 [Product Specification](https://www.google.at/url?sa=t&rct=j&q=&esrc=s&source=web&cd=2&cad=rja&uact=8&sqi=2&ved=0CCQQFjABahUKEwjB_5i834rIAhWDwxQKHRtVDdI&url=https%3A%2F%2Fsentinel.esa.int%2Fdocuments%2F247904%2F349490%2FS2_MSI_Product_Specification.pdf&usg=AFQjCNEI-gxDbhIpFaDPXq1e1NEZNRHoSQ&sig2=aUy9lsNqJlgCF3PLrA1vbQ&bvm=bv.103073922,d.bGQ).
+
 ## Example
 
 Create SentinelDataSet object and provide path to the unzipped Sentinel data set:
