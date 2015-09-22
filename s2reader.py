@@ -11,48 +11,60 @@ from shapely.geometry import Polygon
 import numpy as np
 import re
 
-# create class SentinelDataSet
+def granule_identifier_to_xml_name(granule_identifier):
+    '''
+    Very ugly way to convert the granule identifier.
+    e.g.
+    From
+    Granule Identifier:
+    S2A_OPER_MSI_L1C_TL_SGS__20150817T131818_A000792_T28QBG_N01.03
+    To
+    Granule Metadata XML name:
+    S2A_OPER_MTD_L1C_TL_SGS__20150817T131818_A000792_T28QCJ.xml
+    '''
+    # Replace "MSI" with "MTD".
+    changed_item_type = re.sub("_MSI_", "_MTD_", granule_identifier)
+    # Split string up by underscores.
+    split_by_underscores = changed_item_type.split("_")
+    del split_by_underscores[-1]
+    cleaned = str()
+    # Stitch string list together, adding the previously removed underscores.
+    for i in split_by_underscores:
+        cleaned += (i + "_")
+    # Remove last underscore and append XML file extension.
+    out_xml = cleaned[:-1] + ".xml"
 
-# attributes:
+    return out_xml
 
-# .granules
-## List of granules found. / iterator
-## use granuleIdentifier as subfolder, IMAGE_ID + jp2 as file name
-# .bbox
-## Bounding box in WGS84.
-## type: geometry
-# .footprint
-## Footprint in WGS84
-# .product_start_time
-## TBD
-## type: timestamp
-# .producut_stop_time
-## TBD
-## type: timestamp
-# .processing_level
-## TBD e.g. Level-1C
-## type: string
-# .generation_time
-## TBD
-## type: timestamp
-# .band_name
-## Name of band
-## type: string
+
+def get_granule_xml_path(granule_path, granule_identifier):
+    '''
+    Determines the metadata path by joining the granule path with the XML path.
+    '''
+    xml_name = granule_identifier_to_xml_name(granule_identifier)
+    metadata_path = os.path.join(granule_path, xml_name)
+    try:
+        assert os.path.exists(metadata_path)
+    except Exception:
+        print "Granule metadata XML does not exist:", metadata_path
+        raise
+
+    return metadata_path
+
 
 class Granule(object):
     '''
     This object contains relevant metadata from a granule.
     '''
     def __init__(self, granule, dataset):
-        granules_dir = os.path.join(dataset.path, "GRANULE")
+        granules_path = os.path.join(dataset.path, "GRANULE")
         self.granule_identifier = granule.attrib["granuleIdentifier"]
+        self.granule_path = os.path.join(granules_path, self.granule_identifier)
         self.datastrip_identifier = granule.attrib["datastripIdentifier"]
-        self.path = os.path.join(
-            granules_dir,
+        self.metadata_path = get_granule_xml_path(
+            self.granule_path,
             self.granule_identifier
             )
-        xml = self.granule_identifier.replace('_MSI_', '_MTD_') + ".xml"
-        self.xml_path = os.path.join(self.path, xml)
 
 
 class SentinelDataSet(object):
@@ -77,7 +89,6 @@ class SentinelDataSet(object):
             self.path
             )
         # Read product metadata XML.
-        print self.product_metadata_path
         product_metadata = ET.parse(self.product_metadata_path)
         # Get timestamps.
         (
@@ -91,7 +102,7 @@ class SentinelDataSet(object):
         self.footprint = get_footprint(product_metadata)
         get_xml_data_objects(manifest_safe, self.path)
         # Read granule info.
-        self.granules = get_granules(product_metadata)
+        self.granules = get_granules(product_metadata, self)
 
 
 def get_processing_level(product_metadata):
@@ -116,7 +127,7 @@ def get_timestamps(product_metadata):
     return product_start_time, product_stop_time, generation_time
 
 
-def get_granules(product_metadata):
+def get_granules(product_metadata, self):
     '''
     Finds granules information and returns a list of Granule objects.
     '''
@@ -152,10 +163,15 @@ def get_xml_data_objects(manifest_safe, basepath):
     '''
     manifest = ET.parse(manifest_safe)
     data_object_section = manifest.find("dataObjectSection")
+    # for data_object in data_object_section:
+    #     if data_object.attrib["ID"] == "S2_Level-1C_Tile1_Metadata":
+    #         print data_object.find("byteStream").find("fileLocation").attrib["href"]
     urls = [
         data_object.find("byteStream").find("fileLocation").attrib["href"]
         for data_object in data_object_section
-        if data_object.find("byteStream").attrib["mimeType"] == "application/xml"
+        # if data_object.find("byteStream").attrib[
+        #     "mimeType"] == "application/xml"
+        if data_object.attrib["ID"] == "S2_Level-1C_Tile1_Metadata"
         ]
     xml_urls = [
         url
@@ -163,7 +179,8 @@ def get_xml_data_objects(manifest_safe, basepath):
         if re.search('(.).xml', url)
         ]
     for xml_url in xml_urls:
-        print xml_url
+        #print xml_url
+        pass
 
 
 def footprint_from_coords(coords):
@@ -207,7 +224,6 @@ def get_product_metadata_path(manifest_safe, basepath):
                 raise
             return product_metadata_path
     # TBD improve error handling or, even better, improve getting the file URL.
-
 
 
 # each Granule:
