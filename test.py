@@ -13,34 +13,30 @@ def main(args):
     input_SAFE = parsed.SAFE
     dataset = SentinelDataSet(input_SAFE)
 
-    # # Paths
-    # print "dataset.path:", dataset.path
-    # print "dataset.product_metadata_path:", dataset.product_metadata_path
-    #
-    # # Timestamps
-    # print "dataset.product_start_time:", dataset.product_start_time
-    # print "dataset.product_stop_time:", dataset.product_stop_time
-    # print "dataset.generation_time:", dataset.generation_time
-    #
-    # # Processing level
-    # print "dataset.processing_level:", dataset.processing_level
-    #
-    # # Footprint
-    # print "dataset.footprint:", dataset.footprint
-    #
-    # # Granules
-    # print len(dataset.granules), "granule(s))"
+    # Paths
+    print "dataset.path:", dataset.path
+    print "dataset.product_metadata_path:", dataset.product_metadata_path
+
+    # Timestamps
+    print "dataset.product_start_time:", dataset.product_start_time
+    print "dataset.product_stop_time:", dataset.product_stop_time
+    print "dataset.generation_time:", dataset.generation_time
+
+    # Processing level
+    print "dataset.processing_level:", dataset.processing_level
+
+    # Footprint
+    print "dataset.footprint:", dataset.footprint
+
+    # Granules
+    print len(dataset.granules), "granule(s))"
     x = 1
     for granule in dataset.granules:
         print "granule", x
-        # print "granule.datastrip_identifier", granule.datastrip_identifier
-        # print "granule.granule_identifier", granule.granule_identifier
+        print "granule.datastrip_identifier", granule.datastrip_identifier
+        print "granule.granule_identifier", granule.granule_identifier
         print granule.metadata_path
         x += 1
-
-
-    #evens = [some_special_func(even) for even in range(20) if (even % 2) == 0]
-    #evens = map(some_special_func, filter(lambda e: e%2 == 0, range(20)))
 
 
 if __name__ == "__main__":
