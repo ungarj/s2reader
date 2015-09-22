@@ -100,7 +100,6 @@ class SentinelDataSet(object):
         self.processing_level = get_processing_level(product_metadata)
         # Get product Footprint
         self.footprint = get_footprint(product_metadata)
-        get_xml_data_objects(manifest_safe, self.path)
         # Read granule info.
         self.granules = get_granules(product_metadata, self)
 
@@ -131,7 +130,6 @@ def get_granules(product_metadata, self):
     '''
     Finds granules information and returns a list of Granule objects.
     '''
-    granule_list = []
     for element in product_metadata.iter("Product_Info"):
         product_organisation = element.find("Product_Organisation")
     granules = [
@@ -155,32 +153,6 @@ def get_footprint(product_metadata):
             footprint = footprint_from_coords(coords)
     assert footprint.is_valid
     return footprint
-
-
-def get_xml_data_objects(manifest_safe, basepath):
-    '''
-    Returns path to other metadata XML files.
-    '''
-    manifest = ET.parse(manifest_safe)
-    data_object_section = manifest.find("dataObjectSection")
-    # for data_object in data_object_section:
-    #     if data_object.attrib["ID"] == "S2_Level-1C_Tile1_Metadata":
-    #         print data_object.find("byteStream").find("fileLocation").attrib["href"]
-    urls = [
-        data_object.find("byteStream").find("fileLocation").attrib["href"]
-        for data_object in data_object_section
-        # if data_object.find("byteStream").attrib[
-        #     "mimeType"] == "application/xml"
-        if data_object.attrib["ID"] == "S2_Level-1C_Tile1_Metadata"
-        ]
-    xml_urls = [
-        url
-        for url in urls
-        if re.search('(.).xml', url)
-        ]
-    for xml_url in xml_urls:
-        #print xml_url
-        pass
 
 
 def footprint_from_coords(coords):
@@ -219,7 +191,7 @@ def get_product_metadata_path(manifest_safe, basepath):
             try:
                 assert os.path.isfile(product_metadata_path)
             except AssertionError:
-                error = "S2_Level-1C_product_metadata_path not found: %s" %(
+                print "S2_Level-1C_product_metadata_path not found: %s" %(
                     product_metadata_path)
                 raise
             return product_metadata_path
