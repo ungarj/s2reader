@@ -11,6 +11,7 @@ from shapely.geometry import Polygon
 import numpy as np
 import re
 
+
 def granule_identifier_to_xml_name(granule_identifier):
     '''
     Very ugly way to convert the granule identifier.
@@ -65,6 +66,8 @@ class Granule(object):
             self.granule_path,
             self.granule_identifier
             )
+        metadata = ET.parse(self.metadata_path)
+        self.footprint = get_footprint(metadata)
 
 
 class SentinelDataSet(object):
@@ -72,7 +75,6 @@ class SentinelDataSet(object):
     This object contains relevant metadata from the SAFE file and its containing
     granules as Granule() object.
     '''
-
     def __init__(self, path):
         self.path = os.path.normpath(path)
 
@@ -139,19 +141,75 @@ def get_granules(product_metadata, self):
     return granules
 
 
-def get_footprint(product_metadata):
+def is_granule_metadata(metadata):
+    '''
+    If metadata XML has element "TILE_ID", it is assumed that it is the granule
+    metadata file.
+    '''
+    # A bit hacky in checking whether there is a TILE_ID element.
+    if sum(1 for i in metadata.iter("TILE_ID")) == 0:
+        return False
+    else:
+        return True
+
+
+def get_footprint(metadata):
     '''
     Finds the footprint coordinates and returns them as a shapely
     polygon.
     '''
-    product_footprint = product_metadata.iter("Product_Footprint")
-    # I don't know why two "Product_Footprint" items are found.
-    for element in product_footprint:
-        global_footprint = None
-        for global_footprint in element.iter("Global_Footprint"):
-            coords = global_footprint.find("EXT_POS_LIST").text.split()
-            footprint = footprint_from_coords(coords)
-    assert footprint.is_valid
+    # Check whether product or granule footprint needs to be calculated.
+    if is_granule_metadata(metadata):
+        footprint = footprint_from_geocoding(metadata)
+    else:
+        product_footprint = metadata.iter("Product_Footprint")
+        # I don't know why two "Product_Footprint" items are found.
+        for element in product_footprint:
+            global_footprint = None
+            for global_footprint in element.iter("Global_Footprint"):
+                coords = global_footprint.find("EXT_POS_LIST").text.split()
+                footprint = footprint_from_coords(coords)
+    try:
+        assert footprint.is_valid
+    except Exception:
+        from shapely.validation import explain_validity
+        print "No valid footprint could be determined."
+        print explain_validity(footprint)
+        raise
+    return footprint
+
+
+def footprint_from_geocoding(metadata):
+    tile_geocoding = metadata.iter("Tile_Geocoding").next()
+    tile_epsg = tile_geocoding.findall("HORIZONTAL_CS_CODE")[0].text
+    resolution = 10
+    searchstring = ".//*[@resolution='%s']" %(resolution)
+    size, geoposition = tile_geocoding.findall(searchstring)
+    nrows, ncols = (int(i.text) for i in size)
+    ulx, uly, xdim, ydim = (int(i.text) for i in geoposition)
+    lrx = ulx + nrows * resolution
+    lry = uly - ncols * resolution
+    left = ulx
+    right = lrx
+    top = uly
+    bottom = lry
+    points = [
+        (left, top),
+        (right, top),
+        (right, bottom),
+        (left, bottom),
+        (left, top)
+        ]
+    utm_footprint = Polygon(points)
+    from functools import partial
+    import pyproj
+    from shapely.ops import transform
+    project = partial(
+        pyproj.transform,
+        pyproj.Proj(init=tile_epsg),
+        pyproj.Proj(init='EPSG:4326')
+        )
+    footprint = transform(project, utm_footprint)
     return footprint
 
 

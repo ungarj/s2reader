@@ -35,7 +35,8 @@ def main(args):
         print "granule", x
         print "granule.datastrip_identifier", granule.datastrip_identifier
         print "granule.granule_identifier", granule.granule_identifier
-        print granule.metadata_path
+        print granule.footprint
+        assert dataset.footprint.intersects(granule.footprint)
         x += 1
 
 
