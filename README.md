@@ -35,3 +35,22 @@ for granule in dataset.granules:
 ```
 S2A_OPER_MSI_L1C_TL_SGS__20150817T131818_A000792_T28QCJ_N01.03
 ```
+
+## new structure
+
+--> check metadata levels!
+
+```python
+user_product.meta = {
+
+}
+
+for pdi in user_product:
+    pdi.meta = {
+        # depending on metadata level
+    }
+    pdi.bands = {
+        "B01": PATH-TO-J2K,
+        "B02": ...
+    }
+```
