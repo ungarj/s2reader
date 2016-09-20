@@ -6,51 +6,26 @@ Sentinel 2 [Product Specification](https://www.google.at/url?sa=t&rct=j&q=&esrc=
 
 ## Example
 
-Create SentinelDataSet object and provide path to the unzipped Sentinel data set:
-
 ```python
-dataset = SentinelDataSet("<sentinel/folder.SAFE>")
-```
+import s2reader
 
-Read timestamp:
-```python
-print dataset.generation_time
-```
-```
-2015-08-18T10:15:16.000523Z
-```
-Read footprint:
-```python
-print dataset.footprint
-```
-```
-POLYGON ((12.27979756199563 48.72143477590541, 12.32937194517903 47.77767728400375, 12.37649438931929 46.83562569012028, 13.75172281481429 46.85850775796889, 15.12805716115114 46.86562824777826, 15.13036057284293 47.80867846952006, 15.13278403233897 48.75347626852759, 13.77218394564506 48.74622612170926, 13.77216532146613 48.74701138908477, 13.70566314984072 48.74587165639592, 13.63916223052911 48.74551729699724, 13.63918286472035 48.74473229880407, 12.27979756199563 48.72143477590541))
-```
+with s2reader.open("example.SAFE") as s2_product:
+    # returns product start time
+    print s2_product.product_start_time
+    # returns product stop time
+    print s2_product.product_stop_time
+    # returns product generation time
+    print s2_product.generation_time
+    # returns product footprint
+    print s2_product.footprint
+    # iterates through product granules
+    for granule in s2_product.granules:
+        # returns granule path
+        print granule.granule_path
+        # returns granule footprint
+        print granule.footprint
 
-Of course, this works also for the included granules.
-```python
-for granule in dataset.granules:
-    print granule.granule_identifier
-```
-```
-S2A_OPER_MSI_L1C_TL_SGS__20150817T131818_A000792_T28QCJ_N01.03
-```
-
-## new structure
-
---> check metadata levels!
-
-```python
-user_product.meta = {
-
-}
-
-for pdi in user_product:
-    pdi.meta = {
-        # depending on metadata level
-    }
-    pdi.bands = {
-        "B01": PATH-TO-J2K,
-        "B02": ...
-    }
+    # returns list of image paths of a specific band (e.g. all .jp2 files for
+    # band 1)
+    print s2_product.granule_paths(1)
 ```
