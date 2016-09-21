@@ -1,3 +1,4 @@
 *.pyc
 venv/
 s2reader.egg-info/
+dist/

@@ -109,14 +109,15 @@ class SentinelDataSet(object):
             ]
         return granules
 
-    def granule_paths(self, band_index):
+    def granule_paths(self, band_id):
         """Returns the path of all granules of a given band."""
+        band_id = str(band_id).zfill(2)
         try:
-            assert isinstance(band_index, int)
-            assert 13 >= band_index >= 1
+            assert isinstance(band_id, str)
+            assert band_id in BAND_IDS
         except AssertionError:
             raise AttributeError(
-                "band index must be a number between 1 and 13."
+                "band ID not valid: %s" % band_id
                 )
         return [
             os.path.join(
@@ -124,7 +125,7 @@ class SentinelDataSet(object):
                 "".join([
                         "_".join((granule.granule_identifier).split("_")[:-1]),
                         "_B",
-                        str(band_index).zfill(2),
+                        band_id,
                         ".jp2"
                     ])
                 )
@@ -136,6 +137,10 @@ class SentinelDataSet(object):
 
     def __exit__(self, t, v, tb):
         pass
+
+
+BAND_IDS = ["01", "02", "03", "04", "05", "06", "07", "08", "8A", "09", "10",
+    "11", "12"]
 
 
 class SentinelGranule(object):
