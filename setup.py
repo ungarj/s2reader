@@ -17,7 +17,8 @@ setup(
         'shapely',
         'numpy',
         'pyproj',
-        'lxml'
+        'lxml',
+        'cached_property'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

@@ -12,6 +12,7 @@ from functools import partial
 import pyproj
 import numpy as np
 import re
+from cached_property import cached_property
 
 def open(safe_file):
     """
@@ -43,7 +44,7 @@ class SentinelDataSet(object):
         # Read product metadata XML.
         self._product_metadata = parse(self.product_metadata_path)
 
-    @property
+    @cached_property
     def product_metadata_path(self):
         '''Returns path to product metadata XML file.'''
         manifest = parse(self.manifest_safe)
@@ -60,31 +61,31 @@ class SentinelDataSet(object):
                     raise IOError("S2_Level-1C_product_metadata_path not found")
                 return product_metadata_path
 
-    @property
+    @cached_property
     def product_start_time(self):
         '''Finds and returns "Product Start Time"'''
         for element in self._product_metadata.iter("Product_Info"):
             return element.find("PRODUCT_START_TIME").text
 
-    @property
+    @cached_property
     def product_stop_time(self):
         '''Finds and returns the "Product Stop Time".'''
         for element in self._product_metadata.iter("Product_Info"):
             return element.find("PRODUCT_STOP_TIME").text
 
-    @property
+    @cached_property
     def generation_time(self):
         '''Finds and returns the "Generation Time".'''
         for element in self._product_metadata.iter("Product_Info"):
             return element.find("GENERATION_TIME").text
 
-    @property
+    @cached_property
     def processing_level(self):
         '''Finds and returns the "Processing Level".'''
         for element in self._product_metadata.iter("Product_Info"):
             return element.find("PROCESSING_LEVEL").text
 
-    @property
+    @cached_property
     def footprint(self):
         '''Returns product footprint.'''
         product_footprint = self._product_metadata.iter("Product_Footprint")
@@ -95,7 +96,7 @@ class SentinelDataSet(object):
                 coords = global_footprint.find("EXT_POS_LIST").text.split()
                 return _footprint_from_coords(coords)
 
-    @property
+    @cached_property
     def granules(self):
         '''
         Finds granules information and returns a list of SentinelGranule
@@ -103,11 +104,10 @@ class SentinelDataSet(object):
         '''
         for element in self._product_metadata.iter("Product_Info"):
             product_organisation = element.find("Product_Organisation")
-        granules = [
+        return [
             SentinelGranule(_id.find("Granules"), self)
             for _id in product_organisation.findall("Granule_List")
             ]
-        return granules
 
     def granule_paths(self, band_id):
         """Returns the path of all granules of a given band."""
@@ -130,10 +130,8 @@ class SentinelDataSet(object):
     def __exit__(self, t, v, tb):
         pass
 
-
 BAND_IDS = ["01", "02", "03", "04", "05", "06", "07", "08", "8A", "09", "10",
     "11", "12"]
-
 
 class SentinelGranule(object):
     '''
@@ -146,12 +144,12 @@ class SentinelGranule(object):
         self.datastrip_identifier = granule.attrib["datastripIdentifier"]
         self._metadata = parse(self.metadata_path)
 
-    @property
+    @cached_property
     def srid(self):
         tile_geocoding = self._metadata.iter("Tile_Geocoding").next()
         return tile_geocoding.findall("HORIZONTAL_CS_CODE")[0].text
 
-    @property
+    @cached_property
     def metadata_path(self):
         '''
         Determines the metadata path by joining the granule path with the XML
@@ -165,7 +163,7 @@ class SentinelGranule(object):
             raise IOError("Granule metadata XML does not exist:", metadata_path)
         return metadata_path
 
-    @property
+    @cached_property
     def footprint(self):
         '''
         Finds the footprint coordinates and returns them as a shapely
