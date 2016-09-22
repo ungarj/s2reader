@@ -16,11 +16,13 @@ def main(args):
         print testfile.product_stop_time
         print testfile.generation_time
         print testfile.footprint
-        for granule in testfile.granules:
-            print granule.footprint
-        for band_id in BAND_IDS:
-            for path in testfile.granule_paths(band_id):
-                print path
+        # for granule in testfile.granules:
+        #     # print granule.footprint
+        #     print granule.srid
+        #     print granule.band_path(1)
+        # for band_id in BAND_IDS:
+        #     for path in testfile.granule_paths(band_id):
+        #         print path
 
 if __name__ == "__main__":
     main(sys.argv[1:])

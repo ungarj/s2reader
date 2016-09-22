@@ -16,7 +16,8 @@ setup(
     install_requires=[
         'shapely',
         'numpy',
-        'pyproj'
+        'pyproj',
+        'lxml'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

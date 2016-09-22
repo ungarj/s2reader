@@ -5,7 +5,7 @@ Sentinel 2 misson of the European Space Agency (ESA)
 '''
 
 import os
-import xml.etree.ElementTree as ET
+from lxml.etree import parse
 from shapely.geometry import Polygon, box
 from shapely.ops import transform
 from functools import partial
@@ -41,12 +41,12 @@ class SentinelDataSet(object):
             raise IOError("manifest.safe not found: %s" %(self.manifest_safe))
 
         # Read product metadata XML.
-        self._product_metadata = ET.parse(self.product_metadata_path)
+        self._product_metadata = parse(self.product_metadata_path)
 
     @property
     def product_metadata_path(self):
         '''Returns path to product metadata XML file.'''
-        manifest = ET.parse(self.manifest_safe)
+        manifest = parse(self.manifest_safe)
         data_object_section = manifest.find("dataObjectSection")
         for data_object in data_object_section:
             # Find product metadata XML.
@@ -120,15 +120,7 @@ class SentinelDataSet(object):
                 "band ID not valid: %s" % band_id
                 )
         return [
-            os.path.join(
-                os.path.join(granule.granule_path, "IMG_DATA"),
-                "".join([
-                        "_".join((granule.granule_identifier).split("_")[:-1]),
-                        "_B",
-                        band_id,
-                        ".jp2"
-                    ])
-                )
+            granule.band_path(band_id)
             for granule in self.granules
             ]
 
@@ -152,7 +144,12 @@ class SentinelGranule(object):
         self.granule_identifier = granule.attrib["granuleIdentifier"]
         self.granule_path = os.path.join(granules_path, self.granule_identifier)
         self.datastrip_identifier = granule.attrib["datastripIdentifier"]
-        self._metadata = ET.parse(self.metadata_path)
+        self._metadata = parse(self.metadata_path)
+
+    @property
+    def srid(self):
+        tile_geocoding = self._metadata.iter("Tile_Geocoding").next()
+        return tile_geocoding.findall("HORIZONTAL_CS_CODE")[0].text
 
     @property
     def metadata_path(self):
@@ -176,7 +173,6 @@ class SentinelGranule(object):
         '''
         # Check whether product or granule footprint needs to be calculated.
         tile_geocoding = self._metadata.iter("Tile_Geocoding").next()
-        tile_epsg = tile_geocoding.findall("HORIZONTAL_CS_CODE")[0].text
         resolution = 10
         searchstring = ".//*[@resolution='%s']" %(resolution)
         size, geoposition = tile_geocoding.findall(searchstring)
@@ -187,11 +183,30 @@ class SentinelGranule(object):
         utm_footprint = box(ulx, lry, lrx, uly)
         project = partial(
             pyproj.transform,
-            pyproj.Proj(init=tile_epsg),
+            pyproj.Proj(init=self.srid),
             pyproj.Proj(init='EPSG:4326')
             )
         footprint = transform(project, utm_footprint)
         return footprint
+
+    def band_path(self, band_id):
+        band_id = str(band_id).zfill(2)
+        try:
+            assert isinstance(band_id, str)
+            assert band_id in BAND_IDS
+        except AssertionError:
+            raise AttributeError(
+                "band ID not valid: %s" % band_id
+                )
+        return os.path.join(
+            os.path.join(self.granule_path, "IMG_DATA"),
+            "".join([
+                    "_".join((self.granule_identifier).split("_")[:-1]),
+                    "_B",
+                    band_id,
+                    ".jp2"
+                ])
+            )
 
 def _granule_identifier_to_xml_name(granule_identifier):
     '''
