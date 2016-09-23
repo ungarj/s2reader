@@ -5,7 +5,7 @@ Sentinel 2 misson of the European Space Agency (ESA)
 '''
 
 import os
-from lxml.etree import parse
+from lxml.etree import parse, fromstring
 from shapely.geometry import Polygon, box
 from shapely.ops import transform
 from functools import partial
@@ -13,13 +13,14 @@ import pyproj
 import numpy as np
 import re
 from cached_property import cached_property
+import zipfile
 
 def open(safe_file):
     """
     Returns a SentinelDataSet object.
     """
     try:
-        assert os.path.isdir(safe_file)
+        assert os.path.isdir(safe_file) or os.path.isfile(safe_file)
     except AssertionError:
         raise IOError("file not found")
 
@@ -32,31 +33,64 @@ class SentinelDataSet(object):
     granules as SentinelGranule() object.
     '''
     def __init__(self, path):
+        filename, extension = os.path.splitext(path)
+        try:
+            assert extension in [".SAFE", ".ZIP", ".zip"]
+        except AssertionError:
+            raise IOError("only .SAFE folders or zipped .SAFE folders allowed")
+        self.is_zip = True if extension in [".ZIP", ".zip"] else False
         self.path = os.path.normpath(path)
 
-        # Find manifest.safe.
-        self.manifest_safe = os.path.join(self.path, "manifest.safe")
-        try:
-            assert os.path.isfile(self.manifest_safe)
-        except AssertionError:
-            raise IOError("manifest.safe not found: %s" %(self.manifest_safe))
+        if self.is_zip:
+            self._zipfile = zipfile.ZipFile(self.path, 'r')
+            self._zip_root = os.path.basename(filename)
+            self.manifest_safe_path = os.path.join(
+                self._zip_root, "manifest.safe")
+        else:
+            self._zipfile = None
+            self._zip_root = None
+            # Find manifest.safe.
+            self.manifest_safe_path = os.path.join(self.path, "manifest.safe")
 
-        # Read product metadata XML.
-        self._product_metadata = parse(self.product_metadata_path)
+        try:
+            assert os.path.isfile(self.manifest_safe_path) or \
+                self.manifest_safe_path in self._zipfile.namelist()
+        except AssertionError:
+            raise IOError(
+                "manifest.safe not found: %s" %(self.manifest_safe_path)
+                )
+
+    @cached_property
+    def _product_metadata(self):
+        if self.is_zip:
+            return fromstring(self._zipfile.read(self.product_metadata_path))
+        else:
+            return parse(self.product_metadata_path)
+
+    @cached_property
+    def _manifest_safe(self):
+        if self.is_zip:
+            return fromstring(self._zipfile.read(self.manifest_safe_path))
+        else:
+            return parse(self.manifest_safe_path)
 
     @cached_property
     def product_metadata_path(self):
         '''Returns path to product metadata XML file.'''
-        manifest = parse(self.manifest_safe)
-        data_object_section = manifest.find("dataObjectSection")
+        data_object_section = self._manifest_safe.find("dataObjectSection")
         for data_object in data_object_section:
             # Find product metadata XML.
             if data_object.attrib.get("ID") == "S2_Level-1C_Product_Metadata":
-                relpath = data_object.iter("fileLocation").next().attrib["href"]
-                abspath = os.path.join(self.path, relpath)
+                relpath = os.path.relpath(
+                    data_object.iter("fileLocation").next().attrib["href"])
+                if self.is_zip:
+                    abspath = os.path.join(self._zip_root, relpath)
+                else:
+                    abspath = os.path.join(self.path, relpath)
                 product_metadata_path = abspath
                 try:
-                    assert os.path.isfile(product_metadata_path)
+                    assert os.path.isfile(product_metadata_path) or \
+                        self.manifest_safe_path in self._zipfile.namelist()
                 except AssertionError:
                     raise IOError("S2_Level-1C_product_metadata_path not found")
                 return product_metadata_path
@@ -128,7 +162,10 @@ class SentinelDataSet(object):
         return self
 
     def __exit__(self, t, v, tb):
-        pass
+        try:
+            self._zipfile.close()
+        except AttributeError:
+            pass
 
 BAND_IDS = ["01", "02", "03", "04", "05", "06", "07", "08", "8A", "09", "10",
     "11", "12"]
@@ -138,11 +175,21 @@ class SentinelGranule(object):
     This object contains relevant metadata from a granule.
     '''
     def __init__(self, granule, dataset):
-        granules_path = os.path.join(dataset.path, "GRANULE")
+        self.dataset = dataset
+        if self.dataset.is_zip:
+            granules_path = os.path.join(self.dataset._zip_root, "GRANULE")
+        else:
+            granules_path = os.path.join(dataset.path, "GRANULE")
         self.granule_identifier = granule.attrib["granuleIdentifier"]
         self.granule_path = os.path.join(granules_path, self.granule_identifier)
         self.datastrip_identifier = granule.attrib["datastripIdentifier"]
-        self._metadata = parse(self.metadata_path)
+
+    @cached_property
+    def _metadata(self):
+        if self.dataset.is_zip:
+            return fromstring(self.dataset._zipfile.read(self.metadata_path))
+        else:
+            return parse(self.metadata_path)
 
     @cached_property
     def srid(self):
@@ -158,7 +205,8 @@ class SentinelGranule(object):
         xml_name = _granule_identifier_to_xml_name(self.granule_identifier)
         metadata_path = os.path.join(self.granule_path, xml_name)
         try:
-            assert os.path.exists(metadata_path)
+            assert os.path.isfile(metadata_path) or \
+                metadata_path in self.dataset._zipfile.namelist()
         except AssertionError:
             raise IOError("Granule metadata XML does not exist:", metadata_path)
         return metadata_path
@@ -196,8 +244,13 @@ class SentinelGranule(object):
             raise AttributeError(
                 "band ID not valid: %s" % band_id
                 )
+        if self.dataset.is_zip:
+            granule_basepath = "zip://!" + os.path.join(
+                self.dataset.path, self.granule_path)
+        else:
+            granule_basepath = self.granule_path
         return os.path.join(
-            os.path.join(self.granule_path, "IMG_DATA"),
+            os.path.join(granule_basepath, "IMG_DATA"),
             "".join([
                     "_".join((self.granule_identifier).split("_")[:-1]),
                     "_B",
