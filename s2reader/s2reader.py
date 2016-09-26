@@ -1,12 +1,14 @@
 #!/usr/bin/env python
-'''
+"""
+s2reader reads and processes Sentinel-2 L1C SAFE archives.
+
 This module implements an easy abstraction to the SAFE data format used by the
 Sentinel 2 misson of the European Space Agency (ESA)
-'''
+"""
 
 import os
 from lxml.etree import parse, fromstring
-from shapely.geometry import Polygon, box
+from shapely.geometry import Polygon, MultiPolygon, box
 from shapely.ops import transform
 from functools import partial
 import pyproj
@@ -27,12 +29,16 @@ def open(safe_file):
 
 
 class SentinelDataSet(object):
-    '''
+    """
+    Return SentinelDataSet object.
+
     This object contains relevant metadata from the SAFE file and its containing
     granules as SentinelGranule() object.
-    '''
+    """
+
     def __init__(self, path):
-        filename, extension = os.path.splitext(path)
+        """Assert correct path and initialize."""
+        filename, extension = os.path.splitext(os.path.normpath(path))
         try:
             assert extension in [".SAFE", ".ZIP", ".zip"]
         except AssertionError:
@@ -75,7 +81,7 @@ class SentinelDataSet(object):
 
     @cached_property
     def product_metadata_path(self):
-        '''Return path to product metadata XML file.'''
+        """Return path to product metadata XML file."""
         data_object_section = self._manifest_safe.find("dataObjectSection")
         for data_object in data_object_section:
             # Find product metadata XML.
@@ -98,45 +104,42 @@ class SentinelDataSet(object):
 
     @cached_property
     def product_start_time(self):
-        '''Find and returns "Product Start Time"'''
+        """Find and returns "Product Start Time"."""
         for element in self._product_metadata.iter("Product_Info"):
             return element.find("PRODUCT_START_TIME").text
 
     @cached_property
     def product_stop_time(self):
-        '''Find and returns the "Product Stop Time".'''
+        """Find and returns the "Product Stop Time"."""
         for element in self._product_metadata.iter("Product_Info"):
             return element.find("PRODUCT_STOP_TIME").text
 
     @cached_property
     def generation_time(self):
-        '''Find and returns the "Generation Time".'''
+        """Find and returns the "Generation Time"."""
         for element in self._product_metadata.iter("Product_Info"):
-            return element.find("GENERATION_TIME").text
+            return element.findtext("GENERATION_TIME")
 
     @cached_property
     def processing_level(self):
-        '''Find and returns the "Processing Level".'''
+        """Find and returns the "Processing Level"."""
         for element in self._product_metadata.iter("Product_Info"):
-            return element.find("PROCESSING_LEVEL").text
+            return element.findtext("PROCESSING_LEVEL")
 
     @cached_property
     def footprint(self):
-        '''Return product footprint.'''
+        """Return product footprint."""
         product_footprint = self._product_metadata.iter("Product_Footprint")
         # I don't know why two "Product_Footprint" items are found.
         for element in product_footprint:
             global_footprint = None
             for global_footprint in element.iter("Global_Footprint"):
-                coords = global_footprint.find("EXT_POS_LIST").text.split()
-                return _footprint_from_coords(coords)
+                coords = global_footprint.findtext("EXT_POS_LIST").split()
+                return _polygon_from_coords(coords)
 
     @cached_property
     def granules(self):
-        '''
-        Find granules information and returns a list of SentinelGranule
-        objects.
-        '''
+        """Return list of SentinelGranule objects."""
         for element in self._product_metadata.iter("Product_Info"):
             product_organisation = element.find("Product_Organisation")
         return [
@@ -160,29 +163,34 @@ class SentinelDataSet(object):
             ]
 
     def __enter__(self):
+        """Return self."""
         return self
 
     def __exit__(self, t, v, tb):
+        """Do cleanup."""
         try:
             self._zipfile.close()
         except AttributeError:
             pass
 
-BAND_IDS = ["01", "02", "03", "04", "05", "06", "07", "08", "8A", "09", "10",
+BAND_IDS = [
+    "01", "02", "03", "04", "05", "06", "07", "08", "8A", "09", "10",
     "11", "12"]
 
+
 class SentinelGranule(object):
-    '''
-    This object contains relevant metadata from a granule.
-    '''
+    """This object contains relevant metadata from a granule."""
+
     def __init__(self, granule, dataset):
+        """Prepare data paths depending on if ZIP or not."""
         self.dataset = dataset
         if self.dataset.is_zip:
             granules_path = os.path.join(self.dataset._zip_root, "GRANULE")
         else:
             granules_path = os.path.join(dataset.path, "GRANULE")
         self.granule_identifier = granule.attrib["granuleIdentifier"]
-        self.granule_path = os.path.join(granules_path, self.granule_identifier)
+        self.granule_path = os.path.join(
+            granules_path, self.granule_identifier)
         self.datastrip_identifier = granule.attrib["datastripIdentifier"]
 
     @cached_property
@@ -193,31 +201,46 @@ class SentinelGranule(object):
             return parse(self.metadata_path)
 
     @cached_property
+    def _nsmap(self):
+        return {
+            k: v
+            for k, v in self._metadata.getroot().nsmap.iteritems()
+            if k
+            }
+
+    @cached_property
     def srid(self):
+        """Return EPSG code."""
         tile_geocoding = self._metadata.iter("Tile_Geocoding").next()
-        return tile_geocoding.findall("HORIZONTAL_CS_CODE")[0].text
+        return tile_geocoding.findtext("HORIZONTAL_CS_CODE")
 
     @cached_property
     def metadata_path(self):
-        '''
-        Determines the metadata path by joining the granule path with the XML
-        path.
-        '''
+        """Determine the metadata path."""
         xml_name = _granule_identifier_to_xml_name(self.granule_identifier)
         metadata_path = os.path.join(self.granule_path, xml_name)
         try:
             assert os.path.isfile(metadata_path) or \
                 metadata_path in self.dataset._zipfile.namelist()
         except AssertionError:
-            raise IOError("Granule metadata XML does not exist:", metadata_path)
+            raise IOError(
+                "Granule metadata XML does not exist:", metadata_path)
         return metadata_path
 
     @cached_property
+    def cloud_percent(self):
+        """Return percentage of cloud coverage."""
+        image_content_qi = self._metadata.findtext(
+            (
+                """n1:Quality_Indicators_Info/Image_Content_QI/"""
+                """CLOUDY_PIXEL_PERCENTAGE"""
+            ),
+            namespaces=self._nsmap)
+        return float(image_content_qi)
+
+    @cached_property
     def footprint(self):
-        '''
-        Finds the footprint coordinates and returns them as a shapely
-        polygon.
-        '''
+        """Find and return footprint as Shapely Polygon."""
         # Check whether product or granule footprint needs to be calculated.
         tile_geocoding = self._metadata.iter("Tile_Geocoding").next()
         resolution = 10
@@ -238,10 +261,16 @@ class SentinelGranule(object):
 
     @cached_property
     def cloudmask(self):
-        '''Return cloudmask as shapely Polygon.'''
-        return self._get_mask(mask_type="MSK_CLOUDS")
+        """Return cloudmask as a GeoJSON like list."""
+        return list(self._get_mask(mask_type="MSK_CLOUDS"))
+
+    @cached_property
+    def nodata_mask(self):
+        """Return nodata mask as Shapely Polygon."""
+        return MultiPolygon(list(self._get_mask(mask_type="MSK_NODATA")))
 
     def band_path(self, band_id):
+        """Return paths of given band's jp2 files for all granules."""
         band_id = str(band_id).zfill(2)
         try:
             assert isinstance(band_id, str)
@@ -262,25 +291,70 @@ class SentinelGranule(object):
                     "_B",
                     band_id,
                     ".jp2"
-                ])
+                    ])
             )
 
     def _get_mask(self, mask_type=None):
         assert mask_type
+        exterior_str = str(
+            "eop:extentOf/gml:Polygon/gml:exterior/gml:LinearRing/gml:posList"
+        )
+        interior_str = str(
+            "eop:extentOf/gml:Polygon/gml:interior/gml:LinearRing/gml:posList"
+        )
         for item in self._metadata.iter("Pixel_Level_QI").next():
             if item.attrib.get("type") == mask_type:
                 gml = os.path.join(self.granule_path, "QI_DATA/"+item.text)
-        mask = gml.find("eop:Mask")
-        if mask == -1:
-            return Polygon()
-        else:
-            for polygon in cloudmask_gml.findall("Polygon"):
-                print polygon
-            return None
+        root = parse(gml).getroot()
+        nsmap = {k: v for k, v in root.nsmap.iteritems() if k}
+        try:
+            for mask_member in root.iterfind(
+                "eop:maskMembers", namespaces=nsmap):
+                for feature in mask_member:
+                    _type = feature.findtext(
+                        "eop:maskType", namespaces=nsmap)
+                    ext_pts = feature.find(exterior_str, nsmap).text.split()
+                    exterior = _polygon_from_coords(
+                        ext_pts,
+                        fix_geom=True
+                        )
+                    try:
+                        interiors = [
+                            _polygon_from_coords(
+                                int_pts.text.split(),
+                                fix_geom=True
+                            )
+                            for int_pts in feature.findall(interior_str, nsmap)
+                            ]
+                    except AttributeError:
+                        interiors = []
+                    project = partial(
+                        pyproj.transform,
+                        pyproj.Proj(init=self.srid),
+                        pyproj.Proj(init='EPSG:4326')
+                        )
+                    yield dict(
+                        geometry=transform(
+                            project, Polygon(exterior, interiors)
+                            ),
+                        attributes=dict(
+                            maskType=_type
+                            )
+                        )
+        except StopIteration:
+            yield dict(
+                geometry=Polygon(),
+                attributes=dict(
+                    maskType=None
+                    )
+                )
+            raise StopIteration()
+
 
 def _granule_identifier_to_xml_name(granule_identifier):
-    '''
+    """
     Very ugly way to convert the granule identifier.
+
     e.g.
     From
     Granule Identifier:
@@ -288,7 +362,7 @@ def _granule_identifier_to_xml_name(granule_identifier):
     To
     Granule Metadata XML name:
     S2A_OPER_MTD_L1C_TL_SGS__20150817T131818_A000792_T28QBG.xml
-    '''
+    """
     # Replace "MSI" with "MTD".
     changed_item_type = re.sub("_MSI_", "_MTD_", granule_identifier)
     # Split string up by underscores.
@@ -303,11 +377,14 @@ def _granule_identifier_to_xml_name(granule_identifier):
 
     return out_xml
 
-def _footprint_from_coords(coords):
-    '''
-    Convert list of alterating latitude / longitude coordinates and returns it
-    as a shapely Polygon.
-    '''
+
+def _polygon_from_coords(coords, fix_geom=False):
+    """
+    Return Shapely Polygon from coordinates.
+
+    - coords: list of alterating latitude / longitude coordinates
+    - fix_geom: automatically fix geometry
+    """
     number_of_points = len(coords)/2
     coords_as_array = np.array(coords)
     reshaped = coords_as_array.reshape(number_of_points, 2)
@@ -315,10 +392,12 @@ def _footprint_from_coords(coords):
         (float(i[1]), float(i[0]))
         for i in reshaped.tolist()
         ]
-    footprint = Polygon(points)
+    polygon = Polygon(points)
     try:
-        assert footprint.is_valid
-    except Exception:
-        print "Footprint is not valid."
-        raise
-    return footprint
+        assert polygon.is_valid
+        return polygon
+    except AssertionError:
+        if fix_geom:
+            return polygon.buffer(0)
+        else:
+            raise RuntimeError("Geometry is not valid.")

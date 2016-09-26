@@ -16,15 +16,15 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            's2reader = cli.inspect:main'
+            's2_inspect = cli.inspect:main'
         ],
     },
     install_requires=[
         'shapely',
         'numpy',
         'pyproj',
-        'lxml',
-        'cached_property'
+        'cached_property',
+        'zipfile2'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

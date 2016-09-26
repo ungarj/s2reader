@@ -1,36 +1,35 @@
 #!/usr/bin/env python
-""" Command line utility to inspect SAFE files. """
+"""Command line utility to inspect SAFE files."""
 
 import sys
 import argparse
 import s2reader
 import pprint
 
-def main(args=None):
 
-    if args is None:
-        args = sys.argv[1:]
-        parser = argparse.ArgumentParser()
-        parser.add_argument("safe_files", type=str, nargs='*')
-        parser.add_argument("--granules", action="store_true")
-        parsed = parser.parse_args(args)
-    elif isinstance(args, argparse.Namespace):
-        parsed = args
-    else:
-        raise RuntimeError("invalid arguments for mapchete execute")
+def main(args=None):
+    """Print metadata as JSON strings."""
+    args = sys.argv[1:]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("safe_file", type=str, nargs='+')
+    parser.add_argument("--granules", action="store_true")
+    parsed = parser.parse_args(args)
 
     pp = pprint.PrettyPrinter()
-    for safe_file in parsed.safe_files:
+    for safe_file in parsed.safe_file:
         with s2reader.open(safe_file) as safe_dataset:
             if parsed.granules:
                 pp.pprint(
                     dict(
+                        safe_file=safe_file,
                         granules=[
                             dict(
                                 granule_identifier=granule.granule_identifier,
                                 footprint=str(granule.footprint),
                                 srid=granule.srid,
-                                cloudmask=str(granule.cloudmask)
+                                # cloudmask_polys=len(granule.cloudmask),
+                                nodata_mask=str(granule.nodata_mask),
+                                cloud_percent=granule.cloud_percent
                                 )
                             for granule in safe_dataset.granules
                             ]
@@ -52,3 +51,7 @@ def main(args=None):
                         )
                     )
             print "\n"
+
+
+if __name__ == "__main__":
+    main()
