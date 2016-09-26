@@ -11,8 +11,14 @@ setup(
     url='https://github.com/ungarj/s2reader',
     license='MIT',
     packages=[
-        's2reader'
+        's2reader',
+        'cli'
     ],
+    entry_points={
+        'console_scripts': [
+            's2reader = cli.inspect:main'
+        ],
+    },
     install_requires=[
         'shapely',
         'numpy',

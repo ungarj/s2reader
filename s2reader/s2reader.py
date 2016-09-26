@@ -15,14 +15,13 @@ import re
 from cached_property import cached_property
 import zipfile
 
+
 def open(safe_file):
-    """
-    Returns a SentinelDataSet object.
-    """
+    """Return a SentinelDataSet object."""
     try:
         assert os.path.isdir(safe_file) or os.path.isfile(safe_file)
     except AssertionError:
-        raise IOError("file not found")
+        raise IOError("file not found: %s" % safe_file)
 
     return SentinelDataSet(safe_file)
 
@@ -57,7 +56,7 @@ class SentinelDataSet(object):
                 self.manifest_safe_path in self._zipfile.namelist()
         except AssertionError:
             raise IOError(
-                "manifest.safe not found: %s" %(self.manifest_safe_path)
+                "manifest.safe not found: %s" % self.manifest_safe_path
                 )
 
     @cached_property
@@ -76,52 +75,54 @@ class SentinelDataSet(object):
 
     @cached_property
     def product_metadata_path(self):
-        '''Returns path to product metadata XML file.'''
+        '''Return path to product metadata XML file.'''
         data_object_section = self._manifest_safe.find("dataObjectSection")
         for data_object in data_object_section:
             # Find product metadata XML.
             if data_object.attrib.get("ID") == "S2_Level-1C_Product_Metadata":
                 relpath = os.path.relpath(
                     data_object.iter("fileLocation").next().attrib["href"])
-                if self.is_zip:
-                    abspath = os.path.join(self._zip_root, relpath)
-                else:
-                    abspath = os.path.join(self.path, relpath)
-                product_metadata_path = abspath
                 try:
-                    assert os.path.isfile(product_metadata_path) or \
-                        self.manifest_safe_path in self._zipfile.namelist()
+                    if self.is_zip:
+                        abspath = os.path.join(self._zip_root, relpath)
+                        assert abspath in self._zipfile.namelist()
+                    else:
+                        abspath = os.path.join(self.path, relpath)
+                        assert os.path.isfile(abspath)
                 except AssertionError:
-                    raise IOError("S2_Level-1C_product_metadata_path not found")
-                return product_metadata_path
+                    raise IOError(
+                        "S2_Level-1C_product_metadata_path not found: %s \
+                        " % abspath
+                        )
+                return abspath
 
     @cached_property
     def product_start_time(self):
-        '''Finds and returns "Product Start Time"'''
+        '''Find and returns "Product Start Time"'''
         for element in self._product_metadata.iter("Product_Info"):
             return element.find("PRODUCT_START_TIME").text
 
     @cached_property
     def product_stop_time(self):
-        '''Finds and returns the "Product Stop Time".'''
+        '''Find and returns the "Product Stop Time".'''
         for element in self._product_metadata.iter("Product_Info"):
             return element.find("PRODUCT_STOP_TIME").text
 
     @cached_property
     def generation_time(self):
-        '''Finds and returns the "Generation Time".'''
+        '''Find and returns the "Generation Time".'''
         for element in self._product_metadata.iter("Product_Info"):
             return element.find("GENERATION_TIME").text
 
     @cached_property
     def processing_level(self):
-        '''Finds and returns the "Processing Level".'''
+        '''Find and returns the "Processing Level".'''
         for element in self._product_metadata.iter("Product_Info"):
             return element.find("PROCESSING_LEVEL").text
 
     @cached_property
     def footprint(self):
-        '''Returns product footprint.'''
+        '''Return product footprint.'''
         product_footprint = self._product_metadata.iter("Product_Footprint")
         # I don't know why two "Product_Footprint" items are found.
         for element in product_footprint:
@@ -133,7 +134,7 @@ class SentinelDataSet(object):
     @cached_property
     def granules(self):
         '''
-        Finds granules information and returns a list of SentinelGranule
+        Find granules information and returns a list of SentinelGranule
         objects.
         '''
         for element in self._product_metadata.iter("Product_Info"):
@@ -144,7 +145,7 @@ class SentinelDataSet(object):
             ]
 
     def granule_paths(self, band_id):
-        """Returns the path of all granules of a given band."""
+        """Return the path of all granules of a given band."""
         band_id = str(band_id).zfill(2)
         try:
             assert isinstance(band_id, str)
@@ -220,7 +221,7 @@ class SentinelGranule(object):
         # Check whether product or granule footprint needs to be calculated.
         tile_geocoding = self._metadata.iter("Tile_Geocoding").next()
         resolution = 10
-        searchstring = ".//*[@resolution='%s']" %(resolution)
+        searchstring = ".//*[@resolution='%s']" % resolution
         size, geoposition = tile_geocoding.findall(searchstring)
         nrows, ncols = (int(i.text) for i in size)
         ulx, uly, xdim, ydim = (int(i.text) for i in geoposition)
@@ -234,6 +235,11 @@ class SentinelGranule(object):
             )
         footprint = transform(project, utm_footprint)
         return footprint
+
+    @cached_property
+    def cloudmask(self):
+        '''Return cloudmask as shapely Polygon.'''
+        return self._get_mask(mask_type="MSK_CLOUDS")
 
     def band_path(self, band_id):
         band_id = str(band_id).zfill(2)
@@ -259,6 +265,19 @@ class SentinelGranule(object):
                 ])
             )
 
+    def _get_mask(self, mask_type=None):
+        assert mask_type
+        for item in self._metadata.iter("Pixel_Level_QI").next():
+            if item.attrib.get("type") == mask_type:
+                gml = os.path.join(self.granule_path, "QI_DATA/"+item.text)
+        mask = gml.find("eop:Mask")
+        if mask == -1:
+            return Polygon()
+        else:
+            for polygon in cloudmask_gml.findall("Polygon"):
+                print polygon
+            return None
+
 def _granule_identifier_to_xml_name(granule_identifier):
     '''
     Very ugly way to convert the granule identifier.
@@ -268,7 +287,7 @@ def _granule_identifier_to_xml_name(granule_identifier):
     S2A_OPER_MSI_L1C_TL_SGS__20150817T131818_A000792_T28QBG_N01.03
     To
     Granule Metadata XML name:
-    S2A_OPER_MTD_L1C_TL_SGS__20150817T131818_A000792_T28QCJ.xml
+    S2A_OPER_MTD_L1C_TL_SGS__20150817T131818_A000792_T28QBG.xml
     '''
     # Replace "MSI" with "MTD".
     changed_item_type = re.sub("_MSI_", "_MTD_", granule_identifier)
