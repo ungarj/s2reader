@@ -28,7 +28,7 @@ def main(args=None):
                                 footprint=str(granule.footprint),
                                 srid=granule.srid,
                                 # cloudmask_polys=str(granule.cloudmask),
-                                nodata_mask=str(granule.nodata_mask),
+                                # nodata_mask=str(granule.nodata_mask),
                                 cloud_percent=granule.cloud_percent
                                 )
                             for granule in safe_dataset.granules
