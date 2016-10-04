@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""s2reader setup configuration."""
 
 from setuptools import setup
 
@@ -10,13 +11,12 @@ setup(
     author_email='joachim.ungar@gmail.com',
     url='https://github.com/ungarj/s2reader',
     license='MIT',
-    packages=[
-        's2reader',
-        'cli'
+    packages=[ #TODO fix module structure
+        's2reader'
     ],
     entry_points={
         'console_scripts': [
-            's2_inspect = cli.inspect:main'
+            's2_inspect = s2reader.cli.inspect:main'
         ],
     },
     install_requires=[

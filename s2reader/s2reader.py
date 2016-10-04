@@ -202,9 +202,13 @@ class SentinelGranule(object):
 
     @cached_property
     def _nsmap(self):
+        if self.dataset.is_zip:
+            root = self._metadata
+        else:
+            root = self._metadata.getroot()
         return {
             k: v
-            for k, v in self._metadata.getroot().nsmap.iteritems()
+            for k, v in root.nsmap.iteritems()
             if k
             }
 
@@ -262,14 +266,19 @@ class SentinelGranule(object):
     @cached_property
     def cloudmask(self):
         """Return cloudmask as a GeoJSON like list."""
-        return list(self._get_mask(mask_type="MSK_CLOUDS"))
+        polys = list(self._get_mask(mask_type="MSK_CLOUDS"))
+        return MultiPolygon([
+            poly["geometry"]
+            for poly in polys
+            if poly["attributes"]["maskType"] == "OPAQUE"
+        ])
 
     @cached_property
     def nodata_mask(self):
         """Return nodata mask as Shapely Polygon."""
         return MultiPolygon(list(self._get_mask(mask_type="MSK_NODATA")))
 
-    def band_path(self, band_id):
+    def band_path(self, band_id, for_gdal=False):
         """Return paths of given band's jp2 files for all granules."""
         band_id = str(band_id).zfill(2)
         try:
@@ -280,7 +289,9 @@ class SentinelGranule(object):
                 "band ID not valid: %s" % band_id
                 )
         if self.dataset.is_zip:
-            granule_basepath = "zip://!" + os.path.join(
+            # zip_prefix = "zip://!"
+            zip_prefix = "/vsizip/"
+            granule_basepath = zip_prefix + os.path.join(
                 self.dataset.path, self.granule_path)
         else:
             granule_basepath = self.granule_path
@@ -305,7 +316,10 @@ class SentinelGranule(object):
         for item in self._metadata.iter("Pixel_Level_QI").next():
             if item.attrib.get("type") == mask_type:
                 gml = os.path.join(self.granule_path, "QI_DATA/"+item.text)
-        root = parse(gml).getroot()
+        if self.dataset.is_zip:
+            root = fromstring(self.dataset._zipfile.read(gml))
+        else:
+            root = parse(gml).getroot()
         nsmap = {k: v for k, v in root.nsmap.iteritems() if k}
         try:
             for mask_member in root.iterfind(

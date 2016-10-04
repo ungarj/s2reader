@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import s2reader
-from s2reader.s2reader import BAND_IDS
 import sys
 import os
 
