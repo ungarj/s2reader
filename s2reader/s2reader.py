@@ -49,6 +49,12 @@ class SentinelDataSet(object):
         if self.is_zip:
             self._zipfile = zipfile.ZipFile(self.path, 'r')
             self._zip_root = os.path.basename(filename)
+            if not self._zip_root in self._zipfile.namelist():
+                self._zip_root = os.path.basename(filename) + ".SAFE/"
+                try:
+                    assert self._zip_root in self._zipfile.namelist()
+                except:
+                    raise IOError("unknown zipfile structure")
             self.manifest_safe_path = os.path.join(
                 self._zip_root, "manifest.safe")
         else:
