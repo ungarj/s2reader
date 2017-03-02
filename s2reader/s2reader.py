@@ -133,6 +133,30 @@ class SentinelDataSet(object):
             return element.findtext("PROCESSING_LEVEL")
 
     @cached_property
+    def product_type(self):
+        """Find and returns the "Product Type"."""
+        for element in self._product_metadata.iter("Product_Info"):
+            return element.findtext("PRODUCT_TYPE")
+
+    @cached_property
+    def spacecraft_name(self):
+        """Find and returns the "Spacecraft name"."""
+        for element in self._product_metadata.iter("Datatake"):
+            return element.findtext("SPACECRAFT_NAME")
+
+    @cached_property
+    def sensing_orbit_number(self):
+        """Find and returns the "Sensing orbit number"."""
+        for element in self._product_metadata.iter("Datatake"):
+            return element.findtext("SENSING_ORBIT_NUMBER")
+
+    @cached_property
+    def sensing_orbit_direction(self):
+        """Find and returns the "Sensing orbit direction"."""
+        for element in self._product_metadata.iter("Datatake"):
+            return element.findtext("SENSING_ORBIT_DIRECTION")
+
+    @cached_property
     def footprint(self):
         """Return product footprint."""
         product_footprint = self._product_metadata.iter("Product_Footprint")
@@ -236,6 +260,19 @@ class SentinelGranule(object):
             raise IOError(
                 "Granule metadata XML does not exist:", metadata_path)
         return metadata_path
+
+    @cached_property
+    def pvi_path(self):
+        """Determine the PreView Image (PVI) path inside the SAFE pkg."""
+        pvi_name = self._metadata.iter("PVI_FILENAME").next().text.split("_",0)
+        pvi_path = os.path.join(self.granule_path, "QI_DATA/" + pvi_name[len(pvi_name)-1]) + ".jp2"
+        try:
+            assert os.path.isfile(pvi_path) or \
+                pvi_path in self.dataset._zipfile.namelist()
+        except AssertionError:
+            raise IOError(
+                "PVI path does not exist:", pvi_path)
+        return pvi_path
 
     @cached_property
     def cloud_percent(self):
