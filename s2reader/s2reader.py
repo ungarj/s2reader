@@ -133,6 +133,36 @@ class SentinelDataSet(object):
             return element.findtext("PROCESSING_LEVEL")
 
     @cached_property
+    def product_type(self):
+        """Find and returns the "Product Type"."""
+        for element in self._product_metadata.iter("Product_Info"):
+            return element.findtext("PRODUCT_TYPE")
+
+    @cached_property
+    def spacecraft_name(self):
+        """Find and returns the "Spacecraft name"."""
+        for element in self._product_metadata.iter("Datatake"):
+            return element.findtext("SPACECRAFT_NAME")
+
+    @cached_property
+    def sensing_orbit_number(self):
+        """Find and returns the "Sensing orbit number"."""
+        for element in self._product_metadata.iter("Datatake"):
+            return element.findtext("SENSING_ORBIT_NUMBER")
+
+    @cached_property
+    def sensing_orbit_direction(self):
+        """Find and returns the "Sensing orbit direction"."""
+        for element in self._product_metadata.iter("Datatake"):
+            return element.findtext("SENSING_ORBIT_DIRECTION")
+
+    @cached_property
+    def product_format(self):
+        """Find and returns the Safe format."""
+        for element in self._product_metadata.iter("Query_Options"):
+            return element.findtext("PRODUCT_FORMAT")
+
+    @cached_property
     def footprint(self):
         """Return product footprint."""
         product_footprint = self._product_metadata.iter("Product_Footprint")
@@ -148,11 +178,18 @@ class SentinelDataSet(object):
         """Return list of SentinelGranule objects."""
         for element in self._product_metadata.iter("Product_Info"):
             product_organisation = element.find("Product_Organisation")
-        return [
-            SentinelGranule(_id.find("Granules"), self)
-            for _id in product_organisation.findall("Granule_List")
-            ]
-
+        if self.product_format == 'SAFE':
+            return [
+                SentinelGranule(_id.find("Granules"), self)
+                for _id in product_organisation.findall("Granule_List")
+                ]
+        elif self.product_format == 'SAFE_COMPACT':
+            return [
+                SentinelGranuleCompact(_id.find("Granule"), self)
+                for _id in product_organisation.findall("Granule_List")
+                ]
+        else:
+            raise Exception("PRODUCT_FORMAT not recognized in metadata file, found: '" + str(self.safe_format) + "' accepted are 'SAFE' and 'SAFE_COMPACT'")
     def granule_paths(self, band_id):
         """Return the path of all granules of a given band."""
         band_id = str(band_id).zfill(2)
@@ -236,6 +273,19 @@ class SentinelGranule(object):
             raise IOError(
                 "Granule metadata XML does not exist:", metadata_path)
         return metadata_path
+
+    @cached_property
+    def pvi_path(self):
+        """Determine the PreView Image (PVI) path inside the SAFE pkg."""
+        pvi_name = self._metadata.iter("PVI_FILENAME").next().text
+        pvi_path = os.path.join(self.granule_path, "QI_DATA", pvi_name) + ".jp2"
+        try:
+            assert os.path.isfile(pvi_path) or \
+                pvi_path in self.dataset._zipfile.namelist()
+        except AssertionError:
+            raise IOError(
+                "PVI path does not exist:", pvi_path)
+        return pvi_path
 
     @cached_property
     def cloud_percent(self):
@@ -370,6 +420,49 @@ class SentinelGranule(object):
                 )
             raise StopIteration()
 
+class SentinelGranuleCompact(SentinelGranule):
+    """This object contains relevant metadata from a granule."""
+
+    def __init__(self, granule, dataset):
+        """Prepare data paths depending on if ZIP or not."""
+        self.dataset = dataset
+        if self.dataset.is_zip:
+            granules_path = self.dataset._zip_root
+        else:
+            granules_path = dataset.path
+        self.granule_identifier = granule.attrib["granuleIdentifier"]
+        #extract the granule folder name by an IMAGE_FILE name
+        image_file_name = granule.find("IMAGE_FILE").text
+        image_file_name_arr = image_file_name.split("/")
+        self.granule_path = os.path.join(
+            granules_path, image_file_name_arr[0], image_file_name_arr[1])
+        self.datastrip_identifier = granule.attrib["datastripIdentifier"]
+
+    @cached_property
+    def metadata_path(self):
+        """Determine the metadata path."""
+        metadata_path = os.path.join(self.granule_path, 'MTD_TL.xml')
+        try:
+            assert os.path.isfile(metadata_path) or \
+                metadata_path in self.dataset._zipfile.namelist()
+        except AssertionError:
+            raise IOError(
+                "Granule metadata XML does not exist:", metadata_path)
+        return metadata_path
+
+    @cached_property
+    def pvi_path(self):
+        """Determine the PreView Image (PVI) path inside the SAFE pkg."""
+        pvi_name = self._metadata.iter("PVI_FILENAME").next().text
+        pvi_name = pvi_name.split("/")
+        pvi_path = os.path.join(self.granule_path, pvi_name[len(pvi_name)-2], pvi_name[len(pvi_name)-1])
+        try:
+            assert os.path.isfile(pvi_path) or \
+                pvi_path in self.dataset._zipfile.namelist()
+        except AssertionError:
+            raise IOError(
+                "PVI path does not exist:", pvi_path)
+        return pvi_path
 
 def _granule_identifier_to_xml_name(granule_identifier):
     """
