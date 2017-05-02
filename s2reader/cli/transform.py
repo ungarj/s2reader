@@ -182,7 +182,7 @@ EOOM_TEMPLATE_GRANULE = """<?xml version="1.0" encoding="UTF-8"?>
           -->
           <eop:illuminationAzimuthAngle uom="deg">{eoIlluminationAzimuthAngle}</eop:illuminationAzimuthAngle>
           <eop:illuminationZenithAngle uom="deg">{eoIlluminationZenithAngle}</eop:illuminationZenithAngle>
-          <eop:illuminationElevationAngle uom="deg">{eoIlluminationElevationAngle}</eop:illuminationElevationAngle>
+          <!-- <eop:illuminationElevationAngle uom="deg">eoIlluminationElevationAngle</eop:illuminationElevationAngle> -->
         </eop:Acquisition>
       </eop:acquisitionParameters>
     </eop:EarthObservationEquipment>
@@ -443,7 +443,7 @@ def _get_product_template_params(safe_pkg, resolution):
         'eoCreationDate': safe_pkg.generation_time,
         'eoProcessingMode': "DATA_DRIVEN",
 
-        "footprint": metadata.findtext('.//Global_Footprint/EXT_POS_LIST'),
+        "footprint": metadata.findtext('.//Global_Footprint/EXT_POS_LIST').strip(),
 
         'eoIdentifier': identifier,
         'eoProductIdentifier': "%s_%s" % (identifier, resolution),
@@ -488,10 +488,10 @@ def _get_granule_template_params(granule, resolution):
 
     return {
         'eoArchivingCenter': metadata.findtext('.//ARCHIVING_CENTRE'),
-        'footprint': " ".join(
-            "%f %f" % coord
-            for coord in granule.footprint.exterior.coords
-        ),
+        # 'footprint': " ".join(
+        #     "%f %f" % coord
+        #     for coord in granule.footprint.exterior.coords
+        # ),
         'eoIdentifier': granule.granule_identifier,
         'availabilityTime': metadata.findtext('.//ARCHIVING_TIME'),
         'eoArchivingDate': metadata.findtext('.//ARCHIVING_TIME'),
@@ -504,7 +504,7 @@ def _get_granule_template_params(granule, resolution):
 
         'eoIlluminationAzimuthAngle': metadata.findtext('.//Mean_Sun_Angle/AZIMUTH_ANGLE'),
         'eoIlluminationZenithAngle': metadata.findtext('.//Mean_Sun_Angle/ZENITH_ANGLE'),
-        'eoIlluminationElevationAngle': "",
+        # 'eoIlluminationElevationAngle': "",
 
         # not in MD
         # 'optSnowCover': "",
