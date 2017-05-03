@@ -431,6 +431,7 @@ def _get_product_template_params(safe_pkg, resolution):
     ])
 
     identifier = metadata.findtext('.//PRODUCT_URI')
+    footprint = metadata.findtext('.//Global_Footprint/EXT_POS_LIST').strip()
 
     return {
         'timeStart': safe_pkg.product_start_time,
@@ -443,7 +444,7 @@ def _get_product_template_params(safe_pkg, resolution):
         'eoCreationDate': safe_pkg.generation_time,
         'eoProcessingMode': "DATA_DRIVEN",
 
-        "footprint": metadata.findtext('.//Global_Footprint/EXT_POS_LIST').strip(),
+        "footprint": " ".join(_swapped(footprint.split())),
 
         'eoIdentifier': identifier,
         'eoProductIdentifier': "%s_%s" % (identifier, resolution),
@@ -485,6 +486,7 @@ def _get_product_template_params(safe_pkg, resolution):
 
 def _get_granule_template_params(granule, resolution):
     metadata = granule._metadata
+    # footprint = metadata.findtext('.//Global_Footprint/EXT_POS_LIST').strip()
 
     return {
         'eoArchivingCenter': metadata.findtext('.//ARCHIVING_CENTRE'),
@@ -492,6 +494,7 @@ def _get_granule_template_params(granule, resolution):
         #     "%f %f" % coord
         #     for coord in granule.footprint.exterior.coords
         # ),
+        # "footprint": " ".join(_swapped(footprint.split())),
         'eoIdentifier': granule.granule_identifier,
         'availabilityTime': metadata.findtext('.//ARCHIVING_TIME'),
         'eoArchivingDate': metadata.findtext('.//ARCHIVING_TIME'),
@@ -513,6 +516,18 @@ def _get_granule_template_params(granule, resolution):
             granule.granule_identifier, resolution
         ),
     }
+
+
+def _swapped(coords):
+    ret = []
+    for i in range(len(coords))[::2]:
+        print i
+        ret.append(coords[i + 1])
+        ret.append(coords[i])
+
+    print zip(coords, ret)
+    return ret
+
 
 
 if __name__ == "__main__":
