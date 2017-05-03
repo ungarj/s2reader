@@ -444,7 +444,7 @@ def _get_product_template_params(safe_pkg, resolution):
         'eoCreationDate': safe_pkg.generation_time,
         'eoProcessingMode': "DATA_DRIVEN",
 
-        "footprint": " ".join(_swapped(footprint.split())),
+        "footprint": footprint,
 
         'eoIdentifier': identifier,
         'eoProductIdentifier': "%s_%s" % (identifier, resolution),
@@ -525,9 +525,7 @@ def _swapped(coords):
         ret.append(coords[i + 1])
         ret.append(coords[i])
 
-    print zip(coords, ret)
     return ret
-
 
 
 if __name__ == "__main__":
