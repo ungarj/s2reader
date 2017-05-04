@@ -12,11 +12,12 @@ setup(
     url='https://github.com/ungarj/s2reader',
     license='MIT',
     packages=[ #TODO fix module structure
-        's2reader'
+        's2reader', 's2reader.cli'
     ],
     entry_points={
         'console_scripts': [
-            's2_inspect = s2reader.cli.inspect:main'
+            's2_inspect = s2reader.cli.inspect:main',
+            's2_transform = s2reader.cli.transform:main'
         ],
     },
     install_requires=[

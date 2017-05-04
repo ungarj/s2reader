@@ -49,8 +49,11 @@ class SentinelDataSet(object):
         if self.is_zip:
             self._zipfile = zipfile.ZipFile(self.path, 'r')
             self._zip_root = os.path.basename(filename)
-            if not self._zip_root in self._zipfile.namelist():
-                self._zip_root = os.path.basename(filename) + ".SAFE/"
+            if self._zip_root not in self._zipfile.namelist():
+                if not filename.endswith(".SAFE"):
+                    self._zip_root = os.path.basename(filename) + ".SAFE/"
+                else:
+                    self._zip_root = os.path.basename(filename) + "/"
                 try:
                     assert self._zip_root in self._zipfile.namelist()
                 except:
