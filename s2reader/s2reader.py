@@ -374,7 +374,9 @@ class SentinelGranule(object):
         )
         for item in self._metadata.iter("Pixel_Level_QI").next():
             if item.attrib.get("type") == mask_type:
-                gml = os.path.join(self.granule_path, "QI_DATA/"+item.text)
+                gml = os.path.join(
+                    self.granule_path, "QI_DATA", os.path.basename(item.text)
+                )
         if self.dataset.is_zip:
             root = fromstring(self.dataset._zipfile.read(gml))
         else:
@@ -382,20 +384,22 @@ class SentinelGranule(object):
         nsmap = {k: v for k, v in root.nsmap.iteritems() if k}
         try:
             for mask_member in root.iterfind(
-                "eop:maskMembers", namespaces=nsmap):
+                    "eop:maskMembers", namespaces=nsmap):
                 for feature in mask_member:
                     _type = feature.findtext(
                         "eop:maskType", namespaces=nsmap)
                     ext_pts = feature.find(exterior_str, nsmap).text.split()
                     exterior = _polygon_from_coords(
                         ext_pts,
-                        fix_geom=True
-                        )
+                        fix_geom=True,
+                        swap=False
+                    )
                     try:
                         interiors = [
                             _polygon_from_coords(
                                 int_pts.text.split(),
-                                fix_geom=True
+                                fix_geom=True,
+                                swap=False
                             )
                             for int_pts in feature.findall(interior_str, nsmap)
                             ]
@@ -406,6 +410,11 @@ class SentinelGranule(object):
                         pyproj.Proj(init=self.srid),
                         pyproj.Proj(init='EPSG:4326')
                         )
+
+                    print self.srid, transform(
+                            project, Polygon(exterior, interiors)
+                            )
+
                     yield dict(
                         geometry=transform(
                             project, Polygon(exterior, interiors)
@@ -494,7 +503,7 @@ def _granule_identifier_to_xml_name(granule_identifier):
     return out_xml
 
 
-def _polygon_from_coords(coords, fix_geom=False):
+def _polygon_from_coords(coords, fix_geom=False, swap=True):
     """
     Return Shapely Polygon from coordinates.
 
@@ -505,7 +514,7 @@ def _polygon_from_coords(coords, fix_geom=False):
     coords_as_array = np.array(coords)
     reshaped = coords_as_array.reshape(number_of_points, 2)
     points = [
-        (float(i[1]), float(i[0]))
+        (float(i[1]), float(i[0])) if swap else ((float(i[0]), float(i[1])))
         for i in reshaped.tolist()
         ]
     polygon = Polygon(points)
