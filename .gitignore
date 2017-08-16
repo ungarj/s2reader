@@ -3,3 +3,5 @@ venv/
 s2reader.egg-info/
 dist/
 build/
+.cache/
+.eggs/
