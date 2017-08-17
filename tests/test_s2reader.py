@@ -78,8 +78,8 @@ def _test_attributes(test_data, safe_path):
         for granule in safe.granules:
             assert granule.srid.startswith("EPSG")
             assert isinstance(granule.metadata_path, str)
-            # TODO PVI not always available
-            # assert isinstance(granule.pvi_path, str)
+            if granule.pvi_path:
+                assert isinstance(granule.pvi_path, str)
             assert isinstance(granule.cloud_percent, float)
             assert granule.footprint.is_valid
             assert granule.cloudmask.is_valid
@@ -88,5 +88,5 @@ def _test_attributes(test_data, safe_path):
             assert granule.nodata_mask.is_valid
             if not granule.nodata_mask.is_empty:
                 assert granule.nodata_mask.intersects(granule.footprint)
-            assert isinstance(granule.band_path("02"), str)
+            assert isinstance(granule.band_path(2), str)
             assert isinstance(granule.band_path("02", for_gdal=True), str)

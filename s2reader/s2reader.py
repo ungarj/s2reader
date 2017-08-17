@@ -283,16 +283,7 @@ class SentinelGranule(object):
     @cached_property
     def pvi_path(self):
         """Determine the PreView Image (PVI) path inside the SAFE pkg."""
-        pvi_name = self._metadata.iter("PVI_FILENAME").next().text
-        pvi_path = os.path.join(
-            self.granule_path, "QI_DATA", pvi_name) + ".jp2"
-        try:
-            assert os.path.isfile(pvi_path) or \
-                pvi_path in self.dataset._zipfile.namelist()
-        except AssertionError:
-            raise IOError(
-                "PVI path does not exist:", pvi_path)
-        return pvi_path
+        return _pvi_path(self)
 
     @cached_property
     def cloud_percent(self):
@@ -474,19 +465,23 @@ class SentinelGranuleCompact(SentinelGranule):
     @cached_property
     def pvi_path(self):
         """Determine the PreView Image (PVI) path inside the SAFE pkg."""
-        pvi_name = self._metadata.iter("PVI_FILENAME").next().text
-        pvi_name = pvi_name.split("/")
-        pvi_path = os.path.join(
-            self.granule_path,
-            pvi_name[len(pvi_name)-2], pvi_name[len(pvi_name)-1]
-        )
-        try:
-            assert os.path.isfile(pvi_path) or \
-                pvi_path in self.dataset._zipfile.namelist()
-        except AssertionError:
-            raise IOError(
-                "PVI path does not exist:", pvi_path)
-        return pvi_path
+        return _pvi_path(self)
+
+
+def _pvi_path(granule):
+    """Determine the PreView Image (PVI) path inside the SAFE pkg."""
+    pvi_name = granule._metadata.iter("PVI_FILENAME").next().text
+    pvi_name = pvi_name.split("/")
+    pvi_path = os.path.join(
+        granule.granule_path,
+        pvi_name[len(pvi_name)-2], pvi_name[len(pvi_name)-1]
+    )
+    try:
+        assert os.path.isfile(pvi_path) or \
+            pvi_path in granule.dataset._zipfile.namelist()
+    except (AssertionError, AttributeError):
+        return None
+    return pvi_path
 
 
 def _granule_identifier_to_xml_name(granule_identifier):
