@@ -6,9 +6,9 @@ import s2reader
 
 SCRIPTDIR = os.path.dirname(os.path.realpath(__file__))
 TESTDATA_DIR = os.path.join(SCRIPTDIR, "data")
-SAFE = "S2A_OPER_PRD_MSIL1C_PDMC_20160905T104813_R002_V20160905T005712_20160905T010424.SAFE"
-COMPACT_SAFE = "S2A_MSIL1C_20170226T102021_N0204_R065_T32TNM_20170226T102458.SAFE"
-ZIPPED_SAFE = "S2A_MSIL1C_20170809T100031_N0205_R122_T32TQT_20170809T100028.zip"
+SAFE = "safe/S2A_OPER_PRD_MSIL1C_PDMC_20160905T104813_R002_V20160905T005712_20160905T010424.SAFE"
+COMPACT_SAFE = "compact_safe/S2A_MSIL1C_20170226T102021_N0204_R065_T32TNM_20170226T102458.SAFE"
+ZIPPED_SAFE = "zipped_safe/S2A_MSIL1C_20170809T100031_N0205_R122_T32TQT_20170809T100028.zip"
 
 
 def test_safe():
@@ -78,10 +78,15 @@ def _test_attributes(test_data, safe_path):
         for granule in safe.granules:
             assert granule.srid.startswith("EPSG")
             assert isinstance(granule.metadata_path, str)
-            # assert isinstance(granule.pvi_path, str) TODO PVI not always available
+            # TODO PVI not always available
+            # assert isinstance(granule.pvi_path, str)
             assert isinstance(granule.cloud_percent, float)
             assert granule.footprint.is_valid
-            # assert granule.cloudmask.is_valid TODO get example data with cloudmasks
-            # assert granule.nodata_mask.is_valid TODO get example data with nodata_mask
+            assert granule.cloudmask.is_valid
+            if not granule.cloudmask.is_empty:
+                assert granule.cloudmask.intersects(granule.footprint)
+            assert granule.nodata_mask.is_valid
+            if not granule.nodata_mask.is_empty:
+                assert granule.nodata_mask.intersects(granule.footprint)
             assert isinstance(granule.band_path("02"), str)
             assert isinstance(granule.band_path("02", for_gdal=True), str)

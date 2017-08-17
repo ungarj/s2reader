@@ -20,20 +20,24 @@ import zipfile
 
 def open(safe_file):
     """Return a SentinelDataSet object."""
-    try:
-        assert os.path.isdir(safe_file) or os.path.isfile(safe_file)
-    except AssertionError:
+    if os.path.isdir(safe_file) or os.path.isfile(safe_file):
+        return SentinelDataSet(safe_file)
+    else:
         raise IOError("file not found: %s" % safe_file)
 
-    return SentinelDataSet(safe_file)
+
+BAND_IDS = [
+    "01", "02", "03", "04", "05", "06", "07", "08", "8A", "09", "10",
+    "11", "12"
+]
 
 
 class SentinelDataSet(object):
     """
     Return SentinelDataSet object.
 
-    This object contains relevant metadata from the SAFE file and its containing
-    granules as SentinelGranule() object.
+    This object contains relevant metadata from the SAFE file and its
+    containing granules as SentinelGranule() object.
     """
 
     def __init__(self, path):
@@ -54,9 +58,7 @@ class SentinelDataSet(object):
                     self._zip_root = os.path.basename(filename) + ".SAFE/"
                 else:
                     self._zip_root = os.path.basename(filename) + "/"
-                try:
-                    assert self._zip_root in self._zipfile.namelist()
-                except:
+                if self._zip_root not in self._zipfile.namelist():
                     raise IOError("unknown zipfile structure")
             self.manifest_safe_path = os.path.join(
                 self._zip_root, "manifest.safe")
@@ -108,7 +110,7 @@ class SentinelDataSet(object):
                     raise IOError(
                         "S2_Level-1C_product_metadata_path not found: %s \
                         " % abspath
-                        )
+                    )
                 return abspath
 
     @cached_property
@@ -192,7 +194,12 @@ class SentinelDataSet(object):
                 for _id in product_organisation.findall("Granule_List")
                 ]
         else:
-            raise Exception("PRODUCT_FORMAT not recognized in metadata file, found: '" + str(self.safe_format) + "' accepted are 'SAFE' and 'SAFE_COMPACT'")
+            raise Exception(
+                "PRODUCT_FORMAT not recognized in metadata file, found: '" +
+                str(self.safe_format) +
+                "' accepted are 'SAFE' and 'SAFE_COMPACT'"
+            )
+
     def granule_paths(self, band_id):
         """Return the path of all granules of a given band."""
         band_id = str(band_id).zfill(2)
@@ -218,10 +225,6 @@ class SentinelDataSet(object):
             self._zipfile.close()
         except AttributeError:
             pass
-
-BAND_IDS = [
-    "01", "02", "03", "04", "05", "06", "07", "08", "8A", "09", "10",
-    "11", "12"]
 
 
 class SentinelGranule(object):
@@ -281,7 +284,8 @@ class SentinelGranule(object):
     def pvi_path(self):
         """Determine the PreView Image (PVI) path inside the SAFE pkg."""
         pvi_name = self._metadata.iter("PVI_FILENAME").next().text
-        pvi_path = os.path.join(self.granule_path, "QI_DATA", pvi_name) + ".jp2"
+        pvi_path = os.path.join(
+            self.granule_path, "QI_DATA", pvi_name) + ".jp2"
         try:
             assert os.path.isfile(pvi_path) or \
                 pvi_path in self.dataset._zipfile.namelist()
@@ -319,23 +323,24 @@ class SentinelGranule(object):
             pyproj.Proj(init=self.srid),
             pyproj.Proj(init='EPSG:4326')
             )
-        footprint = transform(project, utm_footprint)
+        footprint = transform(project, utm_footprint).buffer(0)
         return footprint
 
     @cached_property
     def cloudmask(self):
-        """Return cloudmask as a GeoJSON like list."""
+        """Return cloudmask as a shapely geometry."""
         polys = list(self._get_mask(mask_type="MSK_CLOUDS"))
         return MultiPolygon([
             poly["geometry"]
             for poly in polys
             if poly["attributes"]["maskType"] == "OPAQUE"
-        ])
+        ]).buffer(0)
 
     @cached_property
     def nodata_mask(self):
-        """Return nodata mask as Shapely Polygon."""
-        return MultiPolygon(list(self._get_mask(mask_type="MSK_NODATA")))
+        """Return nodata mask as a shapely geometry."""
+        polys = list(self._get_mask(mask_type="MSK_NODATA"))
+        return MultiPolygon([poly["geometry"] for poly in polys]).buffer(0)
 
     def band_path(self, band_id, for_gdal=False):
         """Return paths of given band's jp2 files for all granules."""
@@ -356,13 +361,15 @@ class SentinelGranule(object):
             granule_basepath = self.granule_path
         return os.path.join(
             os.path.join(granule_basepath, "IMG_DATA"),
-            "".join([
+            "".join(
+                [
                     "_".join((self.granule_identifier).split("_")[:-1]),
                     "_B",
                     band_id,
                     ".jp2"
-                    ])
+                ]
             )
+        )
 
     def _get_mask(self, mask_type=None):
         assert mask_type
@@ -388,18 +395,23 @@ class SentinelGranule(object):
                 for feature in mask_member:
                     _type = feature.findtext(
                         "eop:maskType", namespaces=nsmap)
-                    ext_pts = feature.find(exterior_str, nsmap).text.split()
+
+                    ext_elem = feature.find(exterior_str, nsmap)
+                    dims = int(ext_elem.attrib.get('srsDimension', '2'))
+                    ext_pts = ext_elem.text.split()
                     exterior = _polygon_from_coords(
                         ext_pts,
                         fix_geom=True,
-                        swap=False
+                        swap=False,
+                        dims=dims
                     )
                     try:
                         interiors = [
                             _polygon_from_coords(
                                 int_pts.text.split(),
                                 fix_geom=True,
-                                swap=False
+                                swap=False,
+                                dims=dims
                             )
                             for int_pts in feature.findall(interior_str, nsmap)
                             ]
@@ -413,8 +425,8 @@ class SentinelGranule(object):
 
                     yield dict(
                         geometry=transform(
-                            project, Polygon(exterior, interiors)
-                            ),
+                            project, Polygon(exterior, interiors).buffer(0)
+                        ),
                         attributes=dict(
                             maskType=_type
                             )
@@ -428,6 +440,7 @@ class SentinelGranule(object):
                 )
             raise StopIteration()
 
+
 class SentinelGranuleCompact(SentinelGranule):
     """This object contains relevant metadata from a granule."""
 
@@ -439,7 +452,7 @@ class SentinelGranuleCompact(SentinelGranule):
         else:
             granules_path = dataset.path
         self.granule_identifier = granule.attrib["granuleIdentifier"]
-        #extract the granule folder name by an IMAGE_FILE name
+        # extract the granule folder name by an IMAGE_FILE name
         image_file_name = granule.find("IMAGE_FILE").text
         image_file_name_arr = image_file_name.split("/")
         self.granule_path = os.path.join(
@@ -463,7 +476,10 @@ class SentinelGranuleCompact(SentinelGranule):
         """Determine the PreView Image (PVI) path inside the SAFE pkg."""
         pvi_name = self._metadata.iter("PVI_FILENAME").next().text
         pvi_name = pvi_name.split("/")
-        pvi_path = os.path.join(self.granule_path, pvi_name[len(pvi_name)-2], pvi_name[len(pvi_name)-1])
+        pvi_path = os.path.join(
+            self.granule_path,
+            pvi_name[len(pvi_name)-2], pvi_name[len(pvi_name)-1]
+        )
         try:
             assert os.path.isfile(pvi_path) or \
                 pvi_path in self.dataset._zipfile.namelist()
@@ -471,6 +487,7 @@ class SentinelGranuleCompact(SentinelGranule):
             raise IOError(
                 "PVI path does not exist:", pvi_path)
         return pvi_path
+
 
 def _granule_identifier_to_xml_name(granule_identifier):
     """
@@ -499,21 +516,22 @@ def _granule_identifier_to_xml_name(granule_identifier):
     return out_xml
 
 
-def _polygon_from_coords(coords, fix_geom=False, swap=True):
+def _polygon_from_coords(coords, fix_geom=False, swap=True, dims=2):
     """
     Return Shapely Polygon from coordinates.
 
     - coords: list of alterating latitude / longitude coordinates
     - fix_geom: automatically fix geometry
     """
-    number_of_points = len(coords)/2
+    assert len(coords) % dims == 0
+    number_of_points = len(coords)/dims
     coords_as_array = np.array(coords)
-    reshaped = coords_as_array.reshape(number_of_points, 2)
+    reshaped = coords_as_array.reshape(number_of_points, dims)
     points = [
         (float(i[1]), float(i[0])) if swap else ((float(i[0]), float(i[1])))
         for i in reshaped.tolist()
         ]
-    polygon = Polygon(points)
+    polygon = Polygon(points).buffer(0)
     try:
         assert polygon.is_valid
         return polygon
