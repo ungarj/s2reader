@@ -411,10 +411,6 @@ class SentinelGranule(object):
                         pyproj.Proj(init='EPSG:4326')
                         )
 
-                    print self.srid, transform(
-                            project, Polygon(exterior, interiors)
-                            )
-
                     yield dict(
                         geometry=transform(
                             project, Polygon(exterior, interiors)
