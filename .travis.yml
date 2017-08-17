@@ -2,23 +2,20 @@ dist: trusty
 sudo: required
 language: python
 python:
-  - "2.7"
-  # - "3.2"
-  # - "3.3"
-  # - "3.4"
+- '2.7'
 install:
-  - pip install -r requirements.txt
-  - pip install pytest coveralls
-  - pip install .
+- pip install -r requirements.txt
+- pip install pytest coveralls
+- pip install .
 script:
-  - coverage run --source=s2reader setup.py test
+- coverage run --source=s2reader setup.py test
 after_success:
-  - coveralls
+- coveralls
 deploy:
   provider: pypi
   user: ungarj
   password:
-    secure: EocuYQ5YYe0mERJornknNWJWTuTGMLznwA6V0ph1E/uvdrvDU8DXFxPS+1QHAqHwvJ06uqbz/pcRiD11ApfKhEkFewWqMmT3FYJTZD4j5duX8wAkP9K+j7eJanB0rRkP0CfPHqYjqfMXhnvwpD9rokOrXJhINMuQfRrUK4Fqb17mMuWwOEDzQ2bXvViPrdBstyb8ovKqMIe8lZ9TLVP5YSEdsrKQBvbxyv0LHe0ZhNYRkAhHOi0qOWoOZjuEoltmGn49j9C3cUjU/7cW6vUSSho/F0pqvEhRaqJ1iM2sm90aNuNkZ1xL1WU+FwRNf3O6AkbR0FjKojwUwH1kY9oT9329Y/Ql8k0w6kUq1WYXzkddObu2pchuNmqrdNnGepYY0wVzmx/KK0Pbe7zPMc2XgyL1PYCXowiNdycyu1yJAE1l6AsqYIwHLQFuQJ35KUwkPU/bdVHF7H/8UeR2P61pWN7Dmfsk82SgT0zwS+ruMVIyeNhQzaB2CDHy7LfmZPxXbFESJ4e70HKZ4IAmDvpnUssCbrmndpkJF+DFpynV3UY8pY4dfdeEaXr/0pui+a76P3qiwFhPxugBkXG/Uk8fBsdEUfrL2FaJesr5q8N2g4Q56V/pk3DYEuST81uF4z9LrYFb0uDQp2Laxkj4+uhZKIZcnzb3QU9zF4SDlYBiqdw=
+    secure: fS7KC1McPvAHxuTovt1YjUbRfI6CEb0XM2oMB0uZgOng35GTmvXgCbv2Y2s6hiSwHZGFM0WwZJzqDGuv+iaOgiB55hGmSsFgPup6nHLtQz29J7pEgp32uYMB7hu1slwAWOnV8N87VeZj45OPYsMjdpw3bYNslaATDEH/iqciLoHo5iHe0rlutgGrQFsoN7mB/bbQ0Q8Ttumt/z7hhneObo517stlEo2Whp1E8aCdMphTj8JaWpPVrNeVYkB/LRhP/dYbsVBmzhq+EKSyC2OaGXwUZ6w9+3x5sZZ9DdMVaZFm3/4hmBKSFV7zZ5xfisTHV6tgjxvm/RyQqcj73A0ZagMhVTtCXfpEqhUYonuYnlb/niYi3qsBY6KbBaE+/ycr9AoVVUc5JnSoFKRurzWRKoXwRCZyZ8fU/Qxne3xAqr6+dCAdjOMkvGrd5jWHCHVP8LV7PeuonVGHO8K+VtV1NZHTrSyEjo8WUXAvScTnyAkxRdgPjSB0x4UxSZ2YWEDzxPAUdA+mRWKymmNlvHlg17OArQ2N9w63Xr9nk9srDUiyZmI6ts8YFo16W9/j1MI8hMP6lfx/lhfs6IHzHdPaVkluY9nWi3kpSiw+7zPY6pAqm06hQ1Q2nzQEZco6gQXPzn/B793EuIilxcpqhT73C+VMJS7++0SF1tNhYc4kniU=
   on:
     tags: true
     branch: master
