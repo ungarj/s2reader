@@ -1,0 +1,26 @@
+dist: trusty
+sudo: required
+language: python
+python:
+- '2.7'
+virtualenv:
+  system_site_packages: true
+install:
+- pip install -r requirements.txt
+- pip install pytest coveralls
+- pip install .
+script:
+- coverage run --source=s2reader setup.py test
+after_success:
+- coveralls
+deploy:
+  provider: pypi
+  user: ungarj
+  password:
+    secure: EocuYQ5YYe0mERJornknNWJWTuTGMLznwA6V0ph1E/uvdrvDU8DXFxPS+1QHAqHwvJ06uqbz/pcRiD11ApfKhEkFewWqMmT3FYJTZD4j5duX8wAkP9K+j7eJanB0rRkP0CfPHqYjqfMXhnvwpD9rokOrXJhINMuQfRrUK4Fqb17mMuWwOEDzQ2bXvViPrdBstyb8ovKqMIe8lZ9TLVP5YSEdsrKQBvbxyv0LHe0ZhNYRkAhHOi0qOWoOZjuEoltmGn49j9C3cUjU/7cW6vUSSho/F0pqvEhRaqJ1iM2sm90aNuNkZ1xL1WU+FwRNf3O6AkbR0FjKojwUwH1kY9oT9329Y/Ql8k0w6kUq1WYXzkddObu2pchuNmqrdNnGepYY0wVzmx/KK0Pbe7zPMc2XgyL1PYCXowiNdycyu1yJAE1l6AsqYIwHLQFuQJ35KUwkPU/bdVHF7H/8UeR2P61pWN7Dmfsk82SgT0zwS+ruMVIyeNhQzaB2CDHy7LfmZPxXbFESJ4e70HKZ4IAmDvpnUssCbrmndpkJF+DFpynV3UY8pY4dfdeEaXr/0pui+a76P3qiwFhPxugBkXG/Uk8fBsdEUfrL2FaJesr5q8N2g4Q56V/pk3DYEuST81uF4z9LrYFb0uDQp2Laxkj4+uhZKIZcnzb3QU9zF4SDlYBiqdw=
+  on:
+    tags: true
+    branch: master
+env:
+  global:
+    secure: o/sIsSe12EeXHywCe/hgjsTfYAJ0EDzhPu0LsoBKUrdoygTnbYj5YyDZ4zlxdSB8BcPHcoqNeygWuPaNBIqgh1fbpksLXMCA7c2r8AKKOufbblyk9eQmUp/QN0eCj86TZQHUDmvEJvoOhMFwyeTZsuCSm6GwFMm6ESPz3plq0GTlSnoveyWjlNrHm4Brj1zi6rLW6lXSLppf6gQVsAO/Tk575j8K7cQQ8VXpn42h00IQvEti/xOZzOc0Ar+c4JaEv5fFVUU9a9yfix6w+Laq9kzg801m7/+skBaRfPDoFHzo2ANIx3G/wB/ZuB2S9KmzeseXKwSZn93CxLRODFt7NDSfz0h6Sy29IE8N7KgNwxT6sVjUb263OTROtLYNMDcNULvTSsIOVuyag1roCt7Gbk1i8YkwZGBupjn+l+KCEv4YD+GH8Ob0Fk4/+PEccoe4kwtunRD4N+ZmtBzbmx++CF8p3duef+TiofRM6GwC4GZ6oeXEOsns1mpKJoK36B5Nb4ubO9V/fei2u4dm49She8jWPEXzvyjAp4s4k5iCw0OPf/rXIl9aTAEjhlczuwbpYsVtbXHUWA+WIdWHv39uluWV7eQR4Zs4ZxDyZ+uKj60GKadviBYz+8WV0aLsO7aLKJHYun08MoLfyGzPSN8/wunPvMHeChszJb25cA1ii5k=
