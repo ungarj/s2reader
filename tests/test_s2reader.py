@@ -80,6 +80,8 @@ def _test_attributes(test_data, safe_path):
             assert isinstance(granule.metadata_path, str)
             if granule.pvi_path:
                 assert isinstance(granule.pvi_path, str)
+            if granule.tci_path:
+                assert isinstance(granule.tci_path, str)
             assert isinstance(granule.cloud_percent, float)
             assert granule.footprint.is_valid
             assert granule.cloudmask.is_valid

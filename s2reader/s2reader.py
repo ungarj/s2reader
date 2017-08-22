@@ -286,6 +286,25 @@ class SentinelGranule(object):
         return _pvi_path(self)
 
     @cached_property
+    def tci_path(self):
+        """Return the path to the granules TrueColorImage."""
+        tci_paths = [
+            path for path in self.dataset._product_metadata.xpath(
+                ".//Granule[@granuleIdentifier='%s']/IMAGE_FILE/text()"
+                % self.granule_identifier
+            ) if path.endswith('TCI')
+        ]
+        try:
+            tci_path = tci_paths[0]
+        except IndexError:
+            return None
+
+        return os.path.join(
+            self.dataset._zip_root if self.dataset.is_zip else self.dataset.path,
+            tci_path
+        ) + '.jp2'
+
+    @cached_property
     def cloud_percent(self):
         """Return percentage of cloud coverage."""
         image_content_qi = self._metadata.findtext(
