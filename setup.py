@@ -25,7 +25,8 @@ setup(
         'numpy',
         'pyproj',
         'cached_property',
-        'zipfile2'
+        'zipfile2',
+        'lxml'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
