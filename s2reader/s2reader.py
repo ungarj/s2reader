@@ -17,6 +17,8 @@ import re
 from cached_property import cached_property
 import zipfile
 
+from .exceptions import S2ReaderIOError
+
 
 def open(safe_file):
     """Return a SentinelDataSet object."""
@@ -59,7 +61,7 @@ class SentinelDataSet(object):
                 else:
                     self._zip_root = os.path.basename(filename) + "/"
                 if self._zip_root not in self._zipfile.namelist():
-                    raise IOError("unknown zipfile structure")
+                    raise S2ReaderIOError("unknown zipfile structure")
             self.manifest_safe_path = os.path.join(
                 self._zip_root, "manifest.safe")
         else:
@@ -72,7 +74,7 @@ class SentinelDataSet(object):
             assert os.path.isfile(self.manifest_safe_path) or \
                 self.manifest_safe_path in self._zipfile.namelist()
         except AssertionError:
-            raise IOError(
+            raise S2ReaderIOError(
                 "manifest.safe not found: %s" % self.manifest_safe_path
                 )
 
@@ -107,7 +109,7 @@ class SentinelDataSet(object):
                         abspath = os.path.join(self.path, relpath)
                         assert os.path.isfile(abspath)
                 except AssertionError:
-                    raise IOError(
+                    raise S2ReaderIOError(
                         "S2_Level-1C_product_metadata_path not found: %s \
                         " % abspath
                     )
@@ -276,7 +278,7 @@ class SentinelGranule(object):
             assert os.path.isfile(metadata_path) or \
                 metadata_path in self.dataset._zipfile.namelist()
         except AssertionError:
-            raise IOError(
+            raise S2ReaderIOError(
                 "Granule metadata XML does not exist:", metadata_path)
         return metadata_path
 
@@ -477,7 +479,7 @@ class SentinelGranuleCompact(SentinelGranule):
             assert os.path.isfile(metadata_path) or \
                 metadata_path in self.dataset._zipfile.namelist()
         except AssertionError:
-            raise IOError(
+            raise S2ReaderIOError(
                 "Granule metadata XML does not exist:", metadata_path)
         return metadata_path
 
