@@ -43,6 +43,7 @@ def main(args=None):
                         product_stop_time=safe_dataset.product_stop_time,
                         generation_time=safe_dataset.generation_time,
                         footprint=str(safe_dataset.footprint),
+                        bounds=str(safe_dataset.footprint.bounds),
                         granules=len(safe_dataset.granules),
                         granules_srids=list(set([
                             granule.srid
