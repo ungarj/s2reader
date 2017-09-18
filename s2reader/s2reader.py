@@ -7,17 +7,18 @@ Sentinel 2 misson of the European Space Agency (ESA)
 """
 
 import os
+import pyproj
+import numpy as np
+import re
+import zipfile
 from lxml.etree import parse, fromstring
 from shapely.geometry import Polygon, MultiPolygon, box
 from shapely.ops import transform
 from functools import partial
-import pyproj
-import numpy as np
-import re
 from cached_property import cached_property
-import zipfile
+from itertools import chain
 
-from .exceptions import S2ReaderIOError
+from .exceptions import S2ReaderIOError, S2ReaderMetadataError
 
 
 def open(safe_file):
@@ -45,9 +46,7 @@ class SentinelDataSet(object):
     def __init__(self, path):
         """Assert correct path and initialize."""
         filename, extension = os.path.splitext(os.path.normpath(path))
-        try:
-            assert extension in [".SAFE", ".ZIP", ".zip"]
-        except AssertionError:
+        if extension not in [".SAFE", ".ZIP", ".zip"]:
             raise IOError("only .SAFE folders or zipped .SAFE folders allowed")
         self.is_zip = True if extension in [".ZIP", ".zip"] else False
         self.path = os.path.normpath(path)
@@ -70,10 +69,10 @@ class SentinelDataSet(object):
             # Find manifest.safe.
             self.manifest_safe_path = os.path.join(self.path, "manifest.safe")
 
-        try:
-            assert os.path.isfile(self.manifest_safe_path) or \
-                self.manifest_safe_path in self._zipfile.namelist()
-        except AssertionError:
+        if (
+            not os.path.isfile(self.manifest_safe_path) and
+            self.manifest_safe_path not in self._zipfile.namelist()
+        ):
             raise S2ReaderIOError(
                 "manifest.safe not found: %s" % self.manifest_safe_path
                 )
@@ -261,7 +260,7 @@ class SentinelGranule(object):
             k: v
             for k, v in root.nsmap.iteritems()
             if k
-            }
+        }
 
     @cached_property
     def srid(self):
@@ -357,34 +356,62 @@ class SentinelGranule(object):
     def band_path(self, band_id, for_gdal=False):
         """Return paths of given band's jp2 files for all granules."""
         band_id = str(band_id).zfill(2)
-        try:
-            assert isinstance(band_id, str)
-            assert band_id in BAND_IDS
-        except AssertionError:
-            raise AttributeError(
-                "band ID not valid: %s" % band_id
-                )
-        if self.dataset.is_zip:
-            # zip_prefix = "zip://!"
+        if not isinstance(band_id, str) or band_id not in BAND_IDS:
+            raise ValueError("band ID not valid: %s" % band_id)
+        if self.dataset.is_zip and for_gdal:
             zip_prefix = "/vsizip/"
-            granule_basepath = zip_prefix + os.path.join(
-                self.dataset.path, self.granule_path)
+            granule_basepath = zip_prefix + os.path.dirname(
+                self.dataset.product_metadata_path
+            )
         else:
-            granule_basepath = self.granule_path
-        return os.path.join(
-            os.path.join(granule_basepath, "IMG_DATA"),
-            "".join(
-                [
+            granule_basepath = os.path.dirname(
+                self.dataset.product_metadata_path
+            )
+        product_org = self.dataset._product_metadata.iter(
+            "Product_Organisation").next()
+        granule_item = [
+            g
+            for g in chain(*[gl for gl in product_org.iter("Granule_List")])
+            if self.granule_identifier == g.attrib["granuleIdentifier"]
+        ]
+        if len(granule_item) != 1:
+            raise S2ReaderMetadataError(
+                "Granule ID cannot be found in pruduct metadata."
+            )
+        rel_path = [
+            f.text for f in granule_item[0].iter() if f.text[-2:] == band_id
+        ]
+        if len(rel_path) != 1:
+            raise S2ReaderMetadataError(
+                "Image paths could not be extracted from metadata."
+            )
+        img_path = os.path.join(granule_basepath, rel_path[0]) + ".jp2"
+        # Above solution still fails on the "safe" test dataset. Therefore,
+        # the path gets checked if it contains the IMG_DATA folder and if not,
+        # try to guess the path from the old schema. Not happy with this but
+        # couldn't find a better way yet.
+        if "IMG_DATA" in img_path:
+            return img_path
+        else:
+            if self.dataset.is_zip:
+                zip_prefix = "/vsizip/"
+                granule_basepath = zip_prefix + os.path.join(
+                    self.dataset.path, self.granule_path)
+            else:
+                granule_basepath = self.granule_path
+            return os.path.join(
+                os.path.join(granule_basepath, "IMG_DATA"),
+                "".join([
                     "_".join((self.granule_identifier).split("_")[:-1]),
                     "_B",
                     band_id,
                     ".jp2"
-                ]
+                ])
             )
-        )
 
     def _get_mask(self, mask_type=None):
-        assert mask_type
+        if mask_type is None:
+            raise ValueError("mask_type hast to be provided")
         exterior_str = str(
             "eop:extentOf/gml:Polygon/gml:exterior/gml:LinearRing/gml:posList"
         )

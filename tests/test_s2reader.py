@@ -4,11 +4,15 @@
 import os
 import s2reader
 
+from s2reader import BAND_IDS
+
+
 SCRIPTDIR = os.path.dirname(os.path.realpath(__file__))
 TESTDATA_DIR = os.path.join(SCRIPTDIR, "data")
 SAFE = "safe/S2A_OPER_PRD_MSIL1C_PDMC_20160905T104813_R002_V20160905T005712_20160905T010424.SAFE"
 COMPACT_SAFE = "compact_safe/S2A_MSIL1C_20170226T102021_N0204_R065_T32TNM_20170226T102458.SAFE"
 ZIPPED_SAFE = "zipped_safe/S2A_MSIL1C_20170809T100031_N0205_R122_T32TQT_20170809T100028.zip"
+ZIPPED_SAFE_BANDS = "zipped_safe/S2A_MSIL1C_20170908T100031_N0205_R122_T33UWP_20170908T100655.zip"
 
 
 def test_safe():
@@ -59,6 +63,22 @@ def test_zipped_safe():
     _test_attributes(test_data, os.path.join(TESTDATA_DIR, ZIPPED_SAFE))
 
 
+def test_zipped_safe_bands():
+    """Test band paths from zipped SAFE files."""
+    test_data = {
+        'product_start_time': "2017-09-08T10:00:31.026Z",
+        'product_stop_time': "2017-09-08T10:00:31.026Z",
+        'generation_time': "2017-09-08T10:06:55.000000Z",
+        'num_of_granules': 1,
+        'processing_level': 'Level-1C',
+        'product_type': 'S2MSI1C',
+        'spacecraft_name': 'Sentinel-2A',
+        'sensing_orbit_number': '122',
+        'sensing_orbit_direction': 'DESCENDING'
+    }
+    _test_attributes(test_data, os.path.join(TESTDATA_DIR, ZIPPED_SAFE_BANDS))
+
+
 def _test_attributes(test_data, safe_path):
     """Compare dictionary attributes with given SAFE file."""
     with s2reader.open(safe_path) as safe:
@@ -92,3 +112,9 @@ def _test_attributes(test_data, safe_path):
                 assert granule.nodata_mask.intersects(granule.footprint)
             assert isinstance(granule.band_path(2), str)
             assert isinstance(granule.band_path("02", for_gdal=True), str)
+            for bid in BAND_IDS:
+                band_path = granule.band_path(bid, for_gdal=False)
+                if safe.is_zip:
+                    assert band_path in safe._zipfile.namelist()
+                else:
+                    assert os.path.isfile(band_path)
