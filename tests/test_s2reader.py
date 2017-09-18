@@ -111,10 +111,19 @@ def _test_attributes(test_data, safe_path):
             if not granule.nodata_mask.is_empty:
                 assert granule.nodata_mask.intersects(granule.footprint)
             assert isinstance(granule.band_path(2), str)
-            assert isinstance(granule.band_path("02", for_gdal=True), str)
             for bid in BAND_IDS:
-                band_path = granule.band_path(bid, for_gdal=False)
+                abs_path = granule.band_path(bid, absolute=True)
+                assert os.path.isabs(abs_path)
+                rel_path = granule.band_path(bid, absolute=False)
+                abs_gdal_path = granule.band_path(
+                    bid, absolute=True, for_gdal=True
+                )
+                rel_gdal_path = granule.band_path(
+                    bid, absolute=False, for_gdal=True
+                )
                 if safe.is_zip:
-                    assert band_path in safe._zipfile.namelist()
+                    assert abs_gdal_path.startswith("/vsizip/")
+                    assert rel_gdal_path.startswith("/vsizip/")
+                    assert rel_path in safe._zipfile.namelist()
                 else:
-                    assert os.path.isfile(band_path)
+                    assert os.path.isfile(rel_path)

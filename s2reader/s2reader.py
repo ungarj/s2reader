@@ -353,20 +353,32 @@ class SentinelGranule(object):
         polys = list(self._get_mask(mask_type="MSK_NODATA"))
         return MultiPolygon([poly["geometry"] for poly in polys]).buffer(0)
 
-    def band_path(self, band_id, for_gdal=False):
+    def band_path(self, band_id, for_gdal=False, absolute=False):
         """Return paths of given band's jp2 files for all granules."""
         band_id = str(band_id).zfill(2)
         if not isinstance(band_id, str) or band_id not in BAND_IDS:
             raise ValueError("band ID not valid: %s" % band_id)
         if self.dataset.is_zip and for_gdal:
             zip_prefix = "/vsizip/"
-            granule_basepath = zip_prefix + os.path.dirname(
-                self.dataset.product_metadata_path
-            )
+            if absolute:
+                granule_basepath = zip_prefix + os.path.dirname(os.path.join(
+                    self.dataset.path,
+                    self.dataset.product_metadata_path
+                ))
+            else:
+                granule_basepath = zip_prefix + os.path.dirname(
+                    self.dataset.product_metadata_path
+                )
         else:
-            granule_basepath = os.path.dirname(
-                self.dataset.product_metadata_path
-            )
+            if absolute:
+                granule_basepath = os.path.dirname(os.path.join(
+                    self.dataset.path,
+                    self.dataset.product_metadata_path
+                ))
+            else:
+                granule_basepath = os.path.dirname(
+                    self.dataset.product_metadata_path
+                )
         product_org = self.dataset._product_metadata.iter(
             "Product_Organisation").next()
         granule_item = [
