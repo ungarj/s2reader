@@ -5,13 +5,13 @@ from setuptools import setup
 
 setup(
     name='s2reader',
-    version='0.3.3',
+    version='0.4',
     description='simple metadata reader for Sentinel-2 SAFE files',
     author='Joachim Ungar',
     author_email='joachim.ungar@gmail.com',
     url='https://github.com/ungarj/s2reader',
     license='MIT',
-    packages=[ #TODO fix module structure
+    packages=[  # TODO fix module structure
         's2reader', 's2reader.cli'
     ],
     entry_points={
@@ -21,12 +21,12 @@ setup(
         ],
     },
     install_requires=[
+        'lxml',
         'shapely',
         'numpy',
         'pyproj',
         'cached_property',
         'zipfile2',
-        'lxml'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
