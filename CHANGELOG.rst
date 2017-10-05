@@ -3,6 +3,11 @@ Changelog
 #########
 
 ---
+0.5
+---
+* raise warning instead of exception if expected image path is not available
+
+---
 0.4
 ---
 * added footprint bounds to ``s2_inspect`` output
