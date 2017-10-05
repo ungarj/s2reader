@@ -11,6 +11,7 @@ import pyproj
 import numpy as np
 import re
 import zipfile
+import warnings
 from lxml.etree import parse, fromstring
 from shapely.geometry import Polygon, MultiPolygon, box
 from shapely.ops import transform
@@ -388,15 +389,20 @@ class SentinelGranule(object):
         ]
         if len(granule_item) != 1:
             raise S2ReaderMetadataError(
-                "Granule ID cannot be found in pruduct metadata."
+                "Granule ID cannot be found in product metadata."
             )
         rel_path = [
             f.text for f in granule_item[0].iter() if f.text[-2:] == band_id
         ]
         if len(rel_path) != 1:
-            raise S2ReaderMetadataError(
-                "Image paths could not be extracted from metadata."
+            # Apparently some SAFE files don't contain all bands. In such a
+            # case, raise a warning and return None.
+            warnings.warn(
+                "%s: image path to band %s could not be extracted" % (
+                    self.dataset.path, band_id
+                )
             )
+            return
         img_path = os.path.join(granule_basepath, rel_path[0]) + ".jp2"
         # Above solution still fails on the "safe" test dataset. Therefore,
         # the path gets checked if it contains the IMG_DATA folder and if not,
